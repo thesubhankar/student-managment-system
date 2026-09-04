@@ -1,11 +1,12 @@
-from email.mime import message
 import os
+import re
 import tkinter as tk
 import random
+import sqlite3
 from tkinter.ttk import Combobox
 from tkinter.filedialog import askopenfilename
 from PIL import Image, ImageTk
-
+from email.mime import message
 
 
 BASE_DIR = os.path.dirname(__file__)
@@ -487,6 +488,16 @@ def start_creat_account_page(root):
             if entry.get() != "":
                 entry.config(highlightbackground="#2B7B96", highlightcolor="#831689")
     
+    def check_invalid_email(email):
+        pattern = r"^[a-zA-Z0-9._-]+@[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$"
+        
+        if re.match(pattern, email):
+            return False   # Email is valid
+        else:
+            return True    # Email is invalid
+
+
+    
     def check_input_validation():
             if student_name_ent.get() == "":
                 student_name_ent.config(highlightbackground="red",
@@ -527,6 +538,13 @@ def start_creat_account_page(root):
                                          highlightcolor="red")
                 student_gmail_ent.focus()
                 message_box(message="Please Enter Student Gmail ID")
+                return False
+            
+            elif check_invalid_email(email=student_gmail_ent.get().lower()):
+                student_gmail_ent.config(highlightbackground="red",
+                                         highlightcolor="red")
+                student_gmail_ent.focus()
+                message_box(message="Please Enter Valid Gmail ID")
                 return False
             
             elif account_password_ent.get() == "":

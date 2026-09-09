@@ -7,6 +7,7 @@ from tkinter.ttk import Combobox
 from tkinter.filedialog import askopenfilename
 from PIL import Image, ImageTk
 from email.mime import message
+from database import add_data
 
 
 BASE_DIR = os.path.dirname(__file__)
@@ -554,6 +555,50 @@ def start_creat_account_page(root):
                 message_box(message="Please Enter Student Password")
                 return False
             
+            else:
+                import io
+                pic_data = b''
+                if pic_path.get() != '':
+                    with Image.open(pic_path.get()) as img:
+                        resize_pic = img.resize((100, 100))
+                        buffer = io.BytesIO()
+                        resize_pic.save(buffer, format="PNG")
+                        pic_data = buffer.getvalue()
+                else:
+                    default_img_path = os.path.join(IMAGES_DIR, 'add_student_img.png')
+                    if os.path.exists(default_img_path):
+                        with open(default_img_path, 'rb') as read_data:
+                            pic_data = read_data.read()
+                
+                try:
+                    add_data(
+                        id_number=student_id_ent.get(),
+                        password=account_password_ent.get(),
+                        name=student_name_ent.get(),
+                        age=student_age_ent.get(),
+                        gender=student_gender.get(),
+                        phone_number=student_contact_ent.get(),
+                        student_class=select_student_class_btn.get(),
+                        email=student_gmail_ent.get(),
+                        pic_data=pic_data
+                    )
+                    message_box(message="Account Created Successfully!")
+                    
+                    # Reset fields
+                    student_name_ent.delete(0, tk.END)
+                    student_age_ent.delete(0, tk.END)
+                    student_contact_ent.delete(0, tk.END)
+                    select_student_class_btn.set('')
+                    student_gmail_ent.delete(0, tk.END)
+                    account_password_ent.delete(0, tk.END)
+                    student_id_ent.config(state="normal")
+                    student_id_ent.delete(0, tk.END)
+                    student_id_ent.config(state="readonly")
+                    generate_id_btn.config(state="normal")
+                    pic_path.set('')
+                    add_pic_btn.config(image=add_student_pic_icon)
+                except Exception as e:
+                    message_box(message=f"Database Error: {str(e)}")
             
     home_btn = tk.Button(
         add_account_page_fm,

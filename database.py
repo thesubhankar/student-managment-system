@@ -35,7 +35,6 @@ def check_id_already_exist(id_number):
 
 # Alias for backward compatibility / spelling variations
 check_id_alredy_exist = check_id_already_exist
-check_id_alredy_exists = check_id_already_exist
 
 
 

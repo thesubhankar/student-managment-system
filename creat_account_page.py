@@ -6,8 +6,7 @@ import sqlite3
 from tkinter.ttk import Combobox
 from tkinter.filedialog import askopenfilename
 from PIL import Image, ImageTk
-from email.mime import message
-from database import add_data
+from database import add_data, check_id_already_exist, check_id_alredy_exist
 
 
 BASE_DIR = os.path.dirname(__file__)
@@ -246,17 +245,16 @@ def start_creat_account_page(root):
 
     # Student ID Generate
     def generate_id():
-        student_id = random.randint(1000000000, 9999999999)
+        while True:
+            student_id = random.randint(1000000000, 9999999999)
+            if not check_id_already_exist(id_number=student_id):
+                student_id_ent.config(state="normal")
+                student_id_ent.delete(0, tk.END)
+                student_id_ent.insert(0, str(student_id))
+                student_id_ent.config(state="readonly")
+                generate_id_btn.config(state="disabled")
+                break
 
-        student_id_ent.config(state="normal")
-        student_id_ent.delete(0, tk.END)
-        student_id_ent.insert(0, str(student_id))
-        student_id_ent.config(state="readonly")
-        generate_id_btn.config(state="disabled")
-        
-        
-        
-        
     student_id_lb=tk.Label(
         add_account_page_fm,
         text="Student ID number:",

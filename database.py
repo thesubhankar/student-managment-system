@@ -24,6 +24,20 @@ def init_database():
     connection.commit()
     connection.close()
 
+def check_id_already_exist(id_number):
+    connection = sqlite3.connect(DB_PATH)
+    cursor = connection.cursor()
+    cursor.execute("SELECT id_number FROM data WHERE id_number = ?", (str(id_number),))
+    response = cursor.fetchone()
+    connection.close()
+    return response is not None
+
+
+# Alias for backward compatibility / spelling variations
+check_id_alredy_exist = check_id_already_exist
+check_id_alredy_exists = check_id_already_exist
+
+
 
 def add_data(id_number, password, name, age, gender, 
              phone_number, student_class, email, pic_data):

@@ -57,3 +57,13 @@ def check_student_login(id_number, password):
     user = cursor.fetchone()
     connection.close()
     return user
+
+
+def get_student_by_id(id_number):
+    connection = sqlite3.connect(DB_PATH)
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM data WHERE id_number = ?", (str(id_number),))
+    user = cursor.fetchone()
+    connection.close()
+    return user
+

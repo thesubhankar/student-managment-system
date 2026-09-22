@@ -119,12 +119,70 @@ def start_student_login_page(root):
     )
     show_hiden_btn.place(x=350, y=306)
 
+    def message_box(message):
+        message_box_fm = tk.Frame(
+            root,
+            bg="#B7C3B7",
+            highlightbackground="#048D9C",
+            highlightthickness=3,
+        )
+        message_box_fm.place(x=90, y=180, width=320, height=180)
+        
+        message_lb = tk.Label(
+            message_box_fm,
+            text=message,
+            font=('Arial', 12, 'bold'),
+            bg="#B7C3B7",
+            fg="#081579",
+            wraplength=280,
+        )
+        message_lb.place(x=20, y=30, width=280)
+
+        close_btn = tk.Button(
+            message_box_fm,
+            text='Close',
+            font=('Arial', 13, 'bold'),
+            bg="#217A5A",
+            fg="#f7f1f1",
+            bd=0,
+            command=message_box_fm.destroy,
+        )
+        close_btn.place(x=120, y=120, width=80, height=32)
+
+    def handle_student_login():
+        id_val = id_number_ent.get().strip()
+        pwd_val = password_ent.get().strip()
+
+        if not id_val:
+            message_box("Please Enter Student ID Number")
+            id_number_ent.focus()
+            return
+        if not pwd_val:
+            message_box("Please Enter Student Password")
+            password_ent.focus()
+            return
+
+        from database import check_student_login
+        student_data = check_student_login(id_val, pwd_val)
+
+        if student_data:
+            student_login_page_fm.destroy()
+            root.update()
+            from student_card_page import start_student_card_page
+            start_student_card_page(root, student_data, prev_page='student_login')
+        else:
+            message_box("Invalid Student ID or Password!\nPlease try again.")
+
     login_btn = tk.Button(
         student_login_page_fm,
         text='Login',
         font=('Arial', 18, 'bold'),
-        bg="#B7C3B7",
-        fg="#7e6f6f",
+        bg="#159BD7",
+        fg="#FFFFFF",
+        activebackground="#0D7AA8",
+        activeforeground="#FFFFFF",
+        bd=0,
+        command=handle_student_login,
     )
     login_btn.place(x=110, y=390, width=200, height=40)
 
@@ -139,4 +197,5 @@ def start_student_login_page(root):
     student_login_page_fm.pack(pady=30)
     student_login_page_fm.pack_propagate(False)
     student_login_page_fm.configure(width=440, height=530)
+
 

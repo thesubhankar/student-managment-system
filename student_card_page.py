@@ -1,7 +1,12 @@
+"""
+Student Management System - Student ID Card Page
+Displays the official Student Identity Card with photo and details inside the card frame.
+Allows students to download/save high-resolution ID card PNG images to their computer.
+"""
 import os
 import io
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 
 BASE_DIR = os.path.dirname(__file__)
@@ -11,8 +16,9 @@ IMAGES_DIR = os.path.join(BASE_DIR, 'Images')
 def start_student_card_page(root, student_data, prev_page='welcome'):
     """
     Renders the Student ID Card Page.
-    student_data: (id_number, password, name, age, gender, phone_number, student_class, email, image_blob)
+    student_data format: (id_number, password, name, age, gender, phone_number, student_class, email, image_blob)
     """
+    # Extract student record fields
     id_number = str(student_data[0]) if student_data else "N/A"
     name = str(student_data[2]) if student_data else "N/A"
     age = str(student_data[3]) if student_data else "N/A"
@@ -22,7 +28,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
     email = str(student_data[7]) if student_data else "N/A"
     image_blob = student_data[8] if student_data and len(student_data) > 8 else None
 
-    # Load and process student profile image
+    # Load and process student profile photo
     profile_photo_pil = None
     if image_blob:
         try:
@@ -40,7 +46,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
     profile_photo_resized = profile_photo_pil.resize((70, 70), Image.Resampling.LANCZOS)
     profile_photo_tk = ImageTk.PhotoImage(profile_photo_resized)
 
-    # Load Card Frame
+    # Load ID Card Frame Background
     frame_path = os.path.join(IMAGES_DIR, 'student_card_frame.png')
     card_width, card_height = 360, 360
     if os.path.exists(frame_path):
@@ -50,10 +56,11 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
 
     card_frame_tk = ImageTk.PhotoImage(frame_pil)
 
-    # Retain references so garbage collector does not remove them
+    # Keep image references attached to root to prevent garbage collection
     root._card_frame_tk = card_frame_tk
     root._profile_photo_tk = profile_photo_tk
 
+    # Navigation Handler
     def forward_to_previous_page():
         student_card_page_fm.destroy()
         root.update()
@@ -64,7 +71,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
             from welcome_page import start_welcome_page
             start_welcome_page(root)
 
-    # Main page container
+    # Main Card Container
     student_card_page_fm = tk.Frame(
         root,
         bg="#B7C3B7",
@@ -73,7 +80,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
     )
     student_card_page_fm.place(x=25, y=20, width=450, height=560)
 
-    # Header
+    # Header Bar
     heading_lb = tk.Label(
         student_card_page_fm,
         text="Student Identity Card",
@@ -98,7 +105,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
     )
     back_btn.place(x=6, y=5, height=28)
 
-    # Card Canvas
+    # Card Display Canvas
     card_canvas = tk.Canvas(
         student_card_page_fm,
         width=card_width,
@@ -109,10 +116,10 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
     )
     card_canvas.place(x=42, y=48)
 
-    # Draw Card Background Frame
+    # 1. Background Card Frame
     card_canvas.create_image(0, 0, anchor="nw", image=card_frame_tk)
 
-    # Card Header / Title inside frame
+    # 2. Header Text Inside Card
     card_canvas.create_text(
         card_width // 2, 35,
         text="STUDENT MANAGEMENT SYSTEM",
@@ -127,7 +134,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
     )
     card_canvas.create_line(30, 65, card_width - 30, 65, fill="#048D9C", width=2)
 
-    # Student Photo with Border
+    # 3. Student Photo Box
     photo_x, photo_y = 35, 78
     card_canvas.create_rectangle(
         photo_x - 2, photo_y - 2, photo_x + 72, photo_y + 72,
@@ -135,7 +142,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
     )
     card_canvas.create_image(photo_x, photo_y, anchor="nw", image=profile_photo_tk)
 
-    # Student Name & ID in Top Section
+    # 4. Student Name & Primary Details
     card_canvas.create_text(
         120, 85,
         anchor="nw",
@@ -160,7 +167,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
 
     card_canvas.create_line(30, 160, card_width - 30, 160, fill="#CBD5E1", width=1.5)
 
-    # Details rows
+    # 5. Detail Rows
     details = [
         ("Gender / Age:", f"{gender} / {age} yrs"),
         ("Contact No:", phone_number),
@@ -186,7 +193,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
             fill="#0F172A"
         )
 
-    # Card Footer inside frame
+    # 6. Card Footer
     card_canvas.create_line(30, 310, card_width - 30, 310, fill="#048D9C", width=1.5)
     card_canvas.create_text(
         card_width // 2, 330,
@@ -195,7 +202,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
         fill="#64748B"
     )
 
-    # Save Student Card Function
+    # --- Save Card Image to Disk ---
     def save_student_card_image():
         file_path = filedialog.asksaveasfilename(
             parent=root,
@@ -221,7 +228,7 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
                 outline="#1e3a5f", width=2
             )
 
-            # Load default/truetype fonts if available
+            # Load default or truetype fonts
             try:
                 font_title = ImageFont.truetype("arialbd.ttf", 13)
                 font_subtitle = ImageFont.truetype("arialbd.ttf", 15)
@@ -232,29 +239,26 @@ def start_student_card_page(root, student_data, prev_page='welcome'):
             except Exception:
                 font_title = font_subtitle = font_name = font_bold = font_regular = font_small = ImageFont.load_default()
 
-            # Draw Headers
+            # Draw Card Text Elements
             draw.text((card_width // 2, 28), "STUDENT MANAGEMENT SYSTEM", fill="#1e3a5f", anchor="mm", font=font_title)
             draw.text((card_width // 2, 48), "STUDENT IDENTITY CARD", fill="#081579", anchor="mm", font=font_subtitle)
             draw.line([(30, 62), (card_width - 30, 62)], fill="#048D9C", width=2)
 
-            # Student Info Top
             draw.text((120, 80), name, fill="#1e3a5f", font=font_name)
             draw.text((120, 105), f"ID: {id_number}", fill="#081579", font=font_bold)
             draw.text((120, 128), f"Year: {student_class}", fill="#334155", font=font_regular)
 
             draw.line([(30, 158), (card_width - 30, 158)], fill="#CBD5E1", width=1)
 
-            # Details
             for i, (label, val) in enumerate(details):
                 curr_y = start_y + (i * line_spacing) - 5
                 draw.text((35, curr_y), label, fill="#475569", font=font_bold)
                 draw.text((140, curr_y), val, fill="#0F172A", font=font_regular)
 
-            # Footer
             draw.line([(30, 305), (card_width - 30, 305)], fill="#048D9C", width=1)
             draw.text((card_width // 2, 325), "Authorized Student Identity", fill="#64748B", anchor="mm", font=font_small)
 
-            # Save file
+            # Save generated card image
             card_img.convert("RGB").save(file_path)
             show_popup_message("Student Card saved successfully!")
         except Exception as e:

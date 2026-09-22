@@ -1,11 +1,17 @@
+"""
+Student Management System - Student Login Page
+Authenticates student ID and Password, and navigates to the Student ID Card page.
+"""
 import os
 import tkinter as tk
+from database import check_student_login
 
 BASE_DIR = os.path.dirname(__file__)
 IMAGES_DIR = os.path.join(BASE_DIR, 'Images')
 
 
 def start_student_login_page(root):
+    # Load UI Icons
     login_student_icon = tk.PhotoImage(file=os.path.join(IMAGES_DIR, 'login_student_img.png'))
     locked_icon = tk.PhotoImage(file=os.path.join(IMAGES_DIR, 'locked.png'))
     unlocked_icon = tk.PhotoImage(file=os.path.join(IMAGES_DIR, 'unlocked.png'))
@@ -14,6 +20,7 @@ def start_student_login_page(root):
     root.locked_icon = locked_icon
     root.unlocked_icon = unlocked_icon
 
+    # Password Visibility Toggle
     def show_hide_password():
         if password_ent['show'] == '*':
             password_ent.config(show='')
@@ -21,13 +28,15 @@ def start_student_login_page(root):
         else:
             password_ent.config(show='*')
             show_hiden_btn.config(image=locked_icon)
-            
+
+    # Navigation back to Welcome Screen
     def forward_to_welcome_page():
         student_login_page_fm.destroy()
         root.update()
         from welcome_page import start_welcome_page
         start_welcome_page(root)
 
+    # Main Card Container
     student_login_page_fm = tk.Frame(
         root,
         bg="#B7C3B7",
@@ -35,43 +44,44 @@ def start_student_login_page(root):
         highlightthickness=3,
     )
 
+    # Header Bar
     heading_lb = tk.Label(
         student_login_page_fm,
-        text='student login page',
+        text='Student Login',
         bg="#0C3C85",
         fg="#B7C3B7",
         font=('Arial', 18, 'bold'),
     )
     heading_lb.place(x=1, y=1, width=432)
-    
-    back_btn=tk.Button(
+
+    # Back Button
+    back_btn = tk.Button(
         student_login_page_fm,
         text='←',
-        font=('Bold',20),
+        font=('Bold', 20),
         fg="#0c1491",
         bg='#B7C3B7',
         activebackground='#B7C3B7',
-        bd=0, 
+        bd=0,
         relief='flat',
         command=forward_to_welcome_page,
     )
-    back_btn.place(x=5,y=40)
+    back_btn.place(x=5, y=40)
 
+    # Student Avatar Icon
     student_icon_lb = tk.Label(
         student_login_page_fm,
         image=login_student_icon,
         bg='#B7C3B7',
-        activebackground='#B7C3B7',
         bd=0,
-        highlightthickness=0,
-        relief='flat',
     )
     student_icon_lb.place(x=150, y=50)
 
+    # Student ID Entry
     id_number_lb = tk.Label(
         student_login_page_fm,
-        text=' Enter Student Id Number: ',
-        font=('Arial', 18, 'bold'),
+        text='Enter Student ID Number:',
+        font=('Arial', 16, 'bold'),
         bg="#B7C3B7",
         fg="#2c2977",
     )
@@ -79,34 +89,36 @@ def start_student_login_page(root):
 
     id_number_ent = tk.Entry(
         student_login_page_fm,
-        font=('Arial', 18, 'bold'),
+        font=('Arial', 16, 'bold'),
         justify=tk.CENTER,
         highlightcolor="#831689",
         highlightbackground="#2B7B96",
         highlightthickness=1.5,
     )
-    id_number_ent.place(x=80, y=190)
+    id_number_ent.place(x=80, y=185, width=280, height=35)
 
+    # Student Password Entry
     password_lb = tk.Label(
         student_login_page_fm,
-        text=' Enter Student Password:',
-        font=('Arial', 18, 'bold'),
+        text='Enter Student Password:',
+        font=('Arial', 16, 'bold'),
         bg="#B7C3B7",
         fg="#2c2977",
     )
-    password_lb.place(x=70, y=260)
+    password_lb.place(x=70, y=245)
 
     password_ent = tk.Entry(
         student_login_page_fm,
-        font=('Arial', 18, 'bold'),
+        font=('Arial', 16, 'bold'),
         justify=tk.CENTER,
         highlightcolor="#831689",
         highlightbackground="#2B7B96",
         highlightthickness=1.5,
         show='*',
     )
-    password_ent.place(x=80, y=310)
+    password_ent.place(x=80, y=290, width=280, height=35)
 
+    # Show/Hide Password Eye Button
     show_hiden_btn = tk.Button(
         student_login_page_fm,
         image=locked_icon,
@@ -117,8 +129,9 @@ def start_student_login_page(root):
         relief='flat',
         command=show_hide_password,
     )
-    show_hiden_btn.place(x=350, y=306)
+    show_hiden_btn.place(x=365, y=292)
 
+    # Message Popup Dialog
     def message_box(message):
         message_box_fm = tk.Frame(
             root,
@@ -127,7 +140,7 @@ def start_student_login_page(root):
             highlightthickness=3,
         )
         message_box_fm.place(x=90, y=180, width=320, height=180)
-        
+
         message_lb = tk.Label(
             message_box_fm,
             text=message,
@@ -143,12 +156,13 @@ def start_student_login_page(root):
             text='Close',
             font=('Arial', 13, 'bold'),
             bg="#217A5A",
-            fg="#f7f1f1",
+            fg="#FFFFFF",
             bd=0,
             command=message_box_fm.destroy,
         )
         close_btn.place(x=120, y=120, width=80, height=32)
 
+    # Login Authentication Logic
     def handle_student_login():
         id_val = id_number_ent.get().strip()
         pwd_val = password_ent.get().strip()
@@ -162,21 +176,22 @@ def start_student_login_page(root):
             password_ent.focus()
             return
 
-        from database import check_student_login
         student_data = check_student_login(id_val, pwd_val)
 
         if student_data:
+            # Login successful -> Open Student ID Card Page
             student_login_page_fm.destroy()
             root.update()
             from student_card_page import start_student_card_page
             start_student_card_page(root, student_data, prev_page='student_login')
         else:
-            message_box("Invalid Student ID or Password!\nPlease try again.")
+            message_box("Invalid Student ID or Password!\nPlease check and try again.")
 
+    # Action Buttons
     login_btn = tk.Button(
         student_login_page_fm,
         text='Login',
-        font=('Arial', 18, 'bold'),
+        font=('Arial', 16, 'bold'),
         bg="#159BD7",
         fg="#FFFFFF",
         activebackground="#0D7AA8",
@@ -184,18 +199,22 @@ def start_student_login_page(root):
         bd=0,
         command=handle_student_login,
     )
-    login_btn.place(x=110, y=390, width=200, height=40)
+    login_btn.place(x=120, y=370, width=200, height=42)
 
     forget_password_btn = tk.Button(
         student_login_page_fm,
-        text='💀\nForget Password',
+        text='💀 Forget Password?',
         bg='#B7C3B7',
+        activebackground='#B7C3B7',
         fg="#892525",
+        font=('Arial', 11, 'bold'),
+        bd=0,
+        relief='flat',
+        command=lambda: message_box("Please contact system administrator to reset your password."),
     )
-    forget_password_btn.place(x=150, y=450)
+    forget_password_btn.place(x=140, y=435)
 
+    # Frame Placement
     student_login_page_fm.pack(pady=30)
     student_login_page_fm.pack_propagate(False)
     student_login_page_fm.configure(width=440, height=530)
-
-

@@ -29,9 +29,9 @@ def start_creat_account_page(root):
             title="Select Student Profile Photo",
             initialdir=os.path.expanduser("~/Pictures"),
             filetypes=[
-                ("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.gif"),
-                ("PNG Files", "*.png"),
-                ("JPEG Files", "*.jpg;*.jpeg"),
+                ("All Images", ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.webp", "*.gif")),
+                ("PNG Image", "*.png"),
+                ("JPEG Image", ("*.jpg", "*.jpeg")),
                 ("All Files", "*.*")
             ]
         )

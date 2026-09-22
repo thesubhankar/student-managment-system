@@ -20,18 +20,32 @@ def start_creat_account_page(root):
     
     
     
-    pic_path= tk.StringVar()
+    pic_path = tk.StringVar()
     pic_path.set('')
+
     def open_pic():
-        path = askopenfilename(filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.gif")])
-        
+        path = askopenfilename(
+            parent=root,
+            title="Select Student Profile Photo",
+            initialdir=os.path.expanduser("~/Pictures"),
+            filetypes=[
+                ("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.gif"),
+                ("PNG Files", "*.png"),
+                ("JPEG Files", "*.jpg;*.jpeg"),
+                ("All Files", "*.*")
+            ]
+        )
         if path:
-            img= ImageTk.PhotoImage(Image.open(path).resize((100, 100)))
-            pic_path.set(path)
-            
-            
-            add_pic_btn.config(image=img)
-            add_pic_btn.image=img
+            try:
+                with Image.open(path) as raw_img:
+                    resized = raw_img.convert("RGBA").resize((100, 100), Image.Resampling.LANCZOS)
+                    img = ImageTk.PhotoImage(resized)
+                    pic_path.set(path)
+                    add_pic_btn.config(image=img)
+                    add_pic_btn.image = img
+            except Exception as e:
+                message_box(f"Could not load image: {str(e)}")
+
     
     
     

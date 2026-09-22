@@ -1,5 +1,7 @@
 import os
 import re
+import base64
+import subprocess
 import tkinter as tk
 import random
 import sqlite3
@@ -13,28 +15,59 @@ BASE_DIR = os.path.dirname(__file__)
 IMAGES_DIR = os.path.join(BASE_DIR, 'Images')
 
 
+def pick_image_file(root):
+    """
+    Opens Modern Windows File Dialog with full thumbnail previews and system integration.
+    Falls back to Tkinter dialog if needed.
+    """
+    try:
+        script = """
+        Add-Type -AssemblyName System.Windows.Forms
+        $dlg = New-Object System.Windows.Forms.OpenFileDialog
+        $dlg.Title = "Select Student Profile Photo"
+        $dlg.Filter = "All Image Files (*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.gif|All Files (*.*)|*.*"
+        $dlg.RestoreDirectory = $true
+        if ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            [Console]::WriteLine($dlg.FileName)
+        }
+        """
+        enc = base64.b64encode(script.encode('utf-16le')).decode('ascii')
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+        res = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", enc],
+            capture_output=True,
+            text=True,
+            startupinfo=startupinfo,
+            creationflags=0x08000000
+        )
+        selected_path = res.stdout.strip()
+        if selected_path and os.path.exists(selected_path):
+            return selected_path
+    except Exception:
+        pass
+
+    return askopenfilename(
+        parent=root,
+        title="Select Student Profile Photo",
+        filetypes=[
+            ("All Images", ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.webp", "*.gif")),
+            ("All Files", "*.*")
+        ]
+    )
+
+
 def start_creat_account_page(root):
     
     add_student_pic_icon=tk.PhotoImage(file=os.path.join(IMAGES_DIR, 'add_image.png'))
     root.add_student_pic_icon=add_student_pic_icon
     
-    
-    
     pic_path = tk.StringVar()
     pic_path.set('')
 
     def open_pic():
-        path = askopenfilename(
-            parent=root,
-            title="Select Student Profile Photo",
-            initialdir=os.path.expanduser("~/Pictures"),
-            filetypes=[
-                ("All Images", ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.webp", "*.gif")),
-                ("PNG Image", "*.png"),
-                ("JPEG Image", ("*.jpg", "*.jpeg")),
-                ("All Files", "*.*")
-            ]
-        )
+        path = pick_image_file(root)
         if path:
             try:
                 with Image.open(path) as raw_img:
@@ -45,6 +78,7 @@ def start_creat_account_page(root):
                     add_pic_btn.image = img
             except Exception as e:
                 message_box(f"Could not load image: {str(e)}")
+
 
     
     

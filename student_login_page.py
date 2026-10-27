@@ -179,11 +179,11 @@ def start_student_login_page(root):
         student_data = check_student_login(id_val, pwd_val)
 
         if student_data:
-            # Login successful -> Open Student ID Card Page
+            # Login successful -> Open Student Dashboard
             student_login_page_fm.destroy()
             root.update()
-            from student_card_page import start_student_card_page
-            start_student_card_page(root, student_data, prev_page='student_login')
+            from student_dashboard_page import start_student_dashboard_page
+            start_student_dashboard_page(root, student_data)
         else:
             message_box("Invalid Student ID or Password!\nPlease check and try again.")
 
@@ -201,16 +201,22 @@ def start_student_login_page(root):
     )
     login_btn.place(x=120, y=370, width=200, height=42)
 
+    def forward_to_forgot_password():
+        student_login_page_fm.destroy()
+        root.update()
+        from forgot_password_page import start_forgot_password_page
+        start_forgot_password_page(root)
+
     forget_password_btn = tk.Button(
         student_login_page_fm,
-        text='💀 Forget Password?',
+        text='🔑 Forgot Password?',
         bg='#B7C3B7',
         activebackground='#B7C3B7',
         fg="#892525",
         font=('Arial', 11, 'bold'),
         bd=0,
         relief='flat',
-        command=lambda: message_box("Please contact system administrator to reset your password."),
+        command=forward_to_forgot_password,
     )
     forget_password_btn.place(x=140, y=435)
 

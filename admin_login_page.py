@@ -177,9 +177,12 @@ def start_admin_login_page(root):
 
         # Default admin credentials check
         if admin_id == "admin" and admin_pwd == "admin123":
-            message_box("Admin Login Successful!")
+            admin_login_page_fm.destroy()
+            root.update()
+            from admin_dashboard_page import start_admin_dashboard_page
+            start_admin_dashboard_page(root)
         else:
-            message_box("Invalid Admin Credentials!\nDefault is admin / admin123")
+            message_box("Invalid Admin Credentials!\nDefault: admin / admin123")
 
     # Action Buttons
     login_btn = tk.Button(

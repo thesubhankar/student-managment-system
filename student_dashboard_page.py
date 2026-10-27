@@ -1,8 +1,10 @@
 """
-Student Management System - Student Dashboard
+Student Management System - Student Dashboard #humanrised
 Provides a complete student portal with Sidebar navigation:
 - Profile View (with circular/framed student photo)
 - ID Card Generator & PNG Export
+- My Attendance (Percentage %, Alert Badge, and History log)
+- Exam Results (Marks breakdown, Grade, and Downloadable Official Report Card)
 - Edit/Update Profile & Change Photo
 - Security / Change Password
 - Announcements & Notices
@@ -11,15 +13,19 @@ Provides a complete student portal with Sidebar navigation:
 import os
 import io
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 
 from database import (
     get_student_by_id,
     update_student,
     update_student_password,
-    get_announcements
+    get_announcements,
+    get_student_attendance_summary,
+    get_student_attendance_history,
+    get_student_marks
 )
+from report_card_generator import preview_report_card_window
 
 BASE_DIR = os.path.dirname(__file__)
 IMAGES_DIR = os.path.join(BASE_DIR, 'Images')
@@ -41,8 +47,8 @@ def start_student_dashboard_page(root, student_data):
     Renders the modern Student Dashboard.
     student_data: (id_number, password, name, age, gender, phone_number, student_class, email, image_blob)
     """
-    # Resize window for dashboard experience
-    root.geometry("860x620")
+    # Resize window for comfortable dashboard experience
+    root.geometry("940x650")
     root.title("Student Management System - Student Portal")
 
     # Load Icons
@@ -99,9 +105,18 @@ def start_student_dashboard_page(root, student_data):
     sidebar_fm.pack(side="left", fill="y")
     sidebar_fm.pack_propagate(False)
 
-    # Sidebar Student Avatar & Name
-    avatar_canvas = tk.Canvas(sidebar_fm, width=90, height=90, bg="#0F172A", bd=0, highlightthickness=0)
-    avatar_canvas.pack(pady=(20, 5))
+    # Profile Avatar in Sidebar
+    avatar_canvas = tk.Label(sidebar_fm, bg="#0F172A", bd=0)
+    avatar_canvas.pack(pady=(15, 6))
+
+    def update_sidebar_avatar():
+        pil_pic = get_profile_pil()
+        circ_pic = make_circular_image(pil_pic, (85, 85))
+        tk_pic = ImageTk.PhotoImage(circ_pic)
+        avatar_canvas.config(image=tk_pic)
+        avatar_canvas.image = tk_pic
+
+    update_sidebar_avatar()
 
     sidebar_name_lb = tk.Label(
         sidebar_fm,
@@ -109,43 +124,29 @@ def start_student_dashboard_page(root, student_data):
         font=('Arial', 11, 'bold'),
         bg="#0F172A",
         fg="#FFFFFF",
-        wraplength=190,
     )
     sidebar_name_lb.pack()
 
-    sidebar_id_lb = tk.Label(
+    sidebar_class_lb = tk.Label(
         sidebar_fm,
-        text=f"ID: {current_student[0]}",
+        text=f"Class: {current_student[6]}",
         font=('Arial', 9),
         bg="#0F172A",
         fg="#94A3B8",
     )
-    sidebar_id_lb.pack(pady=(0, 15))
+    sidebar_class_lb.pack(pady=(0, 10))
 
-    tk.Frame(sidebar_fm, bg="#334155", height=1).pack(fill="x", padx=15, pady=(0, 15))
+    tk.Frame(sidebar_fm, bg="#334155", height=1).pack(fill="x", padx=15, pady=(0, 10))
 
     # Content Area (Right Side)
     content_fm = tk.Frame(body_fm, bg="#F8FAFC")
     content_fm.pack(side="right", fill="both", expand=True, padx=15, pady=15)
 
-    def refresh_sidebar_avatar():
-        pil_img = get_profile_pil()
-        circ = make_circular_image(pil_img, size=(80, 80))
-        tk_circ = ImageTk.PhotoImage(circ)
-        sidebar_fm._avatar = tk_circ
-        avatar_canvas.delete("all")
-        avatar_canvas.create_image(45, 45, image=tk_circ)
-        sidebar_name_lb.config(text=current_student[2])
-        welcome_user_lb.config(text=f"Welcome, {current_student[2]}!")
-
-    refresh_sidebar_avatar()
-
-    # Active Tab Buttons Management
     nav_buttons = {}
 
-    def set_active_button(tab_key):
-        for k, btn in nav_buttons.items():
-            if k == tab_key:
+    def set_active_button(active_key):
+        for key, btn in nav_buttons.items():
+            if key == active_key:
                 btn.config(bg="#1E293B", fg="#38BDF8")
             else:
                 btn.config(bg="#0F172A", fg="#E2E8F0")
@@ -154,37 +155,18 @@ def start_student_dashboard_page(root, student_data):
         for widget in content_fm.winfo_children():
             widget.destroy()
 
-    # Generic Message Popup
     def show_popup(msg, is_error=False):
         pop = tk.Toplevel(root)
-        pop.title("Notification")
-        pop.geometry("320x160")
-        pop.configure(bg="#F1F5F9")
+        pop.title("Alert" if is_error else "Success")
+        pop.geometry("320x130")
+        pop.configure(bg="#F8FAFC")
         pop.resizable(False, False)
         pop.transient(root)
         pop.grab_set()
 
-        lbl = tk.Label(
-            pop,
-            text=msg,
-            font=('Arial', 11, 'bold'),
-            bg="#F1F5F9",
-            fg="#DC2626" if is_error else "#0F766E",
-            wraplength=280,
-            justify="center",
-        )
-        lbl.pack(expand=True, padx=15, pady=15)
-
-        ok_b = tk.Button(
-            pop,
-            text="OK",
-            font=('Arial', 11, 'bold'),
-            bg="#1E3A5F",
-            fg="#FFFFFF",
-            bd=0,
-            command=pop.destroy,
-        )
-        ok_b.pack(pady=(0, 15), ipadx=15, ipady=3)
+        col = "#DC2626" if is_error else "#16A34A"
+        tk.Label(pop, text=msg, font=('Arial', 10, 'bold'), bg="#F8FAFC", fg=col, wraplength=280).pack(pady=(20, 15))
+        tk.Button(pop, text="OK", font=('Arial', 10, 'bold'), bg="#1E3A5F", fg="#FFFFFF", bd=0, command=pop.destroy).pack(ipadx=15, ipady=3)
 
     # ==========================================
     # TAB 1: PROFILE VIEW (Part 10)
@@ -193,360 +175,408 @@ def start_student_dashboard_page(root, student_data):
         clear_content()
         set_active_button("profile")
 
-        title = tk.Label(content_fm, text="Student Profile", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A")
+        title = tk.Label(content_fm, text="My Student Profile", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A")
         title.pack(anchor="w", pady=(0, 15))
 
-        card = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid", highlightthickness=0)
+        card = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
         card.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Photo & Quick Info Header
-        top_row = tk.Frame(card, bg="#FFFFFF")
-        top_row.pack(fill="x", padx=25, pady=20)
+        # Profile Image
+        top_box = tk.Frame(card, bg="#FFFFFF")
+        top_box.pack(fill="x", padx=25, pady=(20, 10))
 
-        photo_canvas = tk.Canvas(top_row, width=100, height=100, bg="#FFFFFF", bd=0, highlightthickness=0)
-        photo_canvas.pack(side="left", padx=(0, 20))
-        circ_photo = make_circular_image(get_profile_pil(), size=(96, 96))
-        card._photo_tk = ImageTk.PhotoImage(circ_photo)
-        photo_canvas.create_image(50, 50, image=card._photo_tk)
+        raw_pic = get_profile_pil()
+        circ_pic = make_circular_image(raw_pic, (110, 110))
+        photo_tk = ImageTk.PhotoImage(circ_pic)
 
-        info_header = tk.Frame(top_row, bg="#FFFFFF")
-        info_header.pack(side="left", fill="both", expand=True)
+        img_lbl = tk.Label(top_box, image=photo_tk, bg="#FFFFFF", bd=0)
+        img_lbl.image = photo_tk
+        img_lbl.pack(side="left", padx=(0, 20))
 
-        tk.Label(info_header, text=current_student[2], font=('Arial', 16, 'bold'), bg="#FFFFFF", fg="#0F172A").pack(anchor="w")
-        tk.Label(info_header, text=f"Roll / Student ID: {current_student[0]}", font=('Arial', 12, 'bold'), bg="#FFFFFF", fg="#2563EB").pack(anchor="w", pady=2)
-        tk.Label(info_header, text=f"Class / Year: {current_student[6]}", font=('Arial', 11), bg="#FFFFFF", fg="#475569").pack(anchor="w")
+        info_header = tk.Frame(top_box, bg="#FFFFFF")
+        info_header.pack(side="left", fill="both")
+
+        tk.Label(info_header, text=current_student[2], font=('Arial', 18, 'bold'), bg="#FFFFFF", fg="#1E293B").pack(anchor="w")
+        tk.Label(info_header, text=f"Student ID: {current_student[0]}", font=('Arial', 12, 'bold'), bg="#FFFFFF", fg="#2563EB").pack(anchor="w", pady=(2, 0))
+        tk.Label(info_header, text=f"Academic Year: {current_student[6]}", font=('Arial', 11), bg="#FFFFFF", fg="#64748B").pack(anchor="w", pady=(2, 0))
 
         tk.Frame(card, bg="#E2E8F0", height=1).pack(fill="x", padx=25, pady=10)
 
-        # Detailed Grid
-        grid_fm = tk.Frame(card, bg="#FFFFFF")
-        grid_fm.pack(fill="both", expand=True, padx=30, pady=10)
+        # Details Grid
+        details_fm = tk.Frame(card, bg="#FFFFFF")
+        details_fm.pack(fill="both", expand=True, padx=30, pady=10)
 
         fields = [
             ("Full Name:", current_student[2]),
             ("Student ID Number:", current_student[0]),
-            ("Academic Year / Class:", current_student[6]),
-            ("Gender / Age:", f"{current_student[4]} / {current_student[3]} years"),
-            ("Contact Phone Number:", current_student[5]),
-            ("Email Address:", current_student[7]),
-            ("Account Status:", "Active / Enrolled ✅"),
+            ("Class / Year:", current_student[6]),
+            ("Age:", current_student[3]),
+            ("Gender:", current_student[4]),
+            ("Contact Phone:", current_student[5]),
+            ("Registered Email:", current_student[7]),
         ]
 
         for i, (label_txt, val_txt) in enumerate(fields):
-            tk.Label(grid_fm, text=label_txt, font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=i, column=0, sticky="w", pady=6)
-            tk.Label(grid_fm, text=val_txt, font=('Arial', 11), bg="#FFFFFF", fg="#0F172A").grid(row=i, column=1, sticky="w", padx=20, pady=6)
+            row = i // 2
+            col = (i % 2) * 2
+
+            tk.Label(details_fm, text=label_txt, font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#64748B").grid(row=row, column=col, sticky="w", padx=(10, 5), pady=8)
+            tk.Label(details_fm, text=str(val_txt), font=('Arial', 11), bg="#FFFFFF", fg="#0F172A").grid(row=row, column=col + 1, sticky="w", padx=(0, 30), pady=8)
 
     # ==========================================
-    # TAB 2: STUDENT ID CARD VIEW
+    # TAB 2: ID CARD VIEW (Part 7)
     # ==========================================
     def show_id_card_view():
         clear_content()
         set_active_button("card")
 
-        top_bar = tk.Frame(content_fm, bg="#F8FAFC")
-        top_bar.pack(fill="x", pady=(0, 10))
+        title = tk.Label(content_fm, text="Official Student ID Card", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A")
+        title.pack(anchor="w", pady=(0, 10))
 
-        tk.Label(top_bar, text="Student Identity Card", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A").pack(side="left")
+        from student_card_page import draw_student_card
 
-        # Frame Container for the ID card canvas
-        card_wrap = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
-        card_wrap.pack(pady=10)
+        card_pil = draw_student_card(
+            student_name=current_student[2],
+            student_class=current_student[6],
+            student_age=current_student[3],
+            student_id=current_student[0],
+            student_image=get_profile_pil()
+        )
 
-        frame_path = os.path.join(IMAGES_DIR, 'student_card_frame.png')
-        card_w, card_h = 340, 340
-        if os.path.exists(frame_path):
-            frame_pil = Image.open(frame_path).convert("RGBA").resize((card_w, card_h), Image.Resampling.LANCZOS)
-        else:
-            frame_pil = Image.new("RGBA", (card_w, card_h), color="#FFFFFF")
-        card_bg_tk = ImageTk.PhotoImage(frame_pil)
-        content_fm._card_bg = card_bg_tk
+        preview_pil = card_pil.resize((480, 300), Image.Resampling.LANCZOS)
+        card_tk = ImageTk.PhotoImage(preview_pil)
 
-        canvas = tk.Canvas(card_wrap, width=card_w, height=card_h, bg="#FFFFFF", bd=0, highlightthickness=0)
-        canvas.pack()
+        card_display = tk.Label(content_fm, image=card_tk, bg="#F8FAFC", bd=1, relief="solid")
+        card_display.image = card_tk
+        card_display.pack(pady=10)
 
-        # Draw frame background
-        canvas.create_image(0, 0, anchor="nw", image=card_bg_tk)
+        btn_row = tk.Frame(content_fm, bg="#F8FAFC")
+        btn_row.pack(pady=10)
 
-        # Header Titles
-        canvas.create_text(card_w // 2, 32, text="STUDENT MANAGEMENT SYSTEM", font=('Arial', 9, 'bold'), fill="#1e3a5f")
-        canvas.create_text(card_w // 2, 48, text="STUDENT IDENTITY CARD", font=('Arial', 11, 'bold'), fill="#081579")
-        canvas.create_line(25, 60, card_w - 25, 60, fill="#048D9C", width=2)
-
-        # Photo
-        prof_pil = get_profile_pil().resize((65, 65), Image.Resampling.LANCZOS)
-        prof_tk = ImageTk.PhotoImage(prof_pil)
-        content_fm._prof_tk = prof_tk
-
-        canvas.create_rectangle(30, 72, 98, 140, outline="#1e3a5f", width=2, fill="#FFFFFF")
-        canvas.create_image(32, 74, anchor="nw", image=prof_tk)
-
-        # Name & ID beside photo
-        canvas.create_text(110, 78, anchor="nw", text=current_student[2], font=('Arial', 11, 'bold'), fill="#1e3a5f")
-        canvas.create_text(110, 100, anchor="nw", text=f"ID: {current_student[0]}", font=('Arial', 10, 'bold'), fill="#081579")
-        canvas.create_text(110, 120, anchor="nw", text=f"Year: {current_student[6]}", font=('Arial', 10), fill="#334155")
-
-        canvas.create_line(25, 150, card_w - 25, 150, fill="#CBD5E1", width=1)
-
-        # Details list
-        details_list = [
-            ("Gender / Age:", f"{current_student[4]} / {current_student[3]} yrs"),
-            ("Contact No:", current_student[5]),
-            ("Email ID:", current_student[7]),
-        ]
-        curr_y = 165
-        for lbl_t, val_t in details_list:
-            canvas.create_text(30, curr_y, anchor="nw", text=lbl_t, font=('Arial', 9, 'bold'), fill="#475569")
-            canvas.create_text(125, curr_y, anchor="nw", text=val_t, font=('Arial', 9), fill="#0F172A")
-            curr_y += 28
-
-        canvas.create_line(25, 290, card_w - 25, 290, fill="#048D9C", width=1.5)
-        canvas.create_text(card_w // 2, 310, text="Authorized Student Identity", font=('Arial', 8, 'italic'), fill="#64748B")
-
-        # Save Card Image Handler
-        def handle_save_card():
-            path = filedialog.asksaveasfilename(
-                title="Save Student Card Image",
+        def save_card():
+            fpath = filedialog.asksaveasfilename(
+                title="Save Student ID Card",
                 defaultextension=".png",
-                initialfile=f"student_card_{current_student[0]}.png",
-                filetypes=[("PNG Image", "*.png"), ("JPEG Image", "*.jpg"), ("All Files", "*.*")]
+                filetypes=[("PNG Image", "*.png")],
+                initialfile=f"ID_Card_{current_student[0]}.png"
             )
-            if not path:
-                return
+            if fpath:
+                try:
+                    card_pil.save(fpath, format="PNG")
+                    show_popup("ID Card saved successfully!")
+                except Exception as e:
+                    show_popup(f"Failed to save card: {str(e)}", is_error=True)
 
-            try:
-                card_img = frame_pil.copy()
-                draw = ImageDraw.Draw(card_img)
-
-                # Paste photo
-                card_img.paste(prof_pil, (32, 74), prof_pil)
-                draw.rectangle([30, 72, 98, 140], outline="#1e3a5f", width=2)
-
-                draw.text((card_w // 2, 28), "STUDENT MANAGEMENT SYSTEM", fill="#1e3a5f", anchor="mm")
-                draw.text((card_w // 2, 46), "STUDENT IDENTITY CARD", fill="#081579", anchor="mm")
-                draw.line([(25, 58), (card_w - 25, 58)], fill="#048D9C", width=2)
-
-                draw.text((110, 75), current_student[2], fill="#1e3a5f")
-                draw.text((110, 96), f"ID: {current_student[0]}", fill="#081579")
-                draw.text((110, 116), f"Year: {current_student[6]}", fill="#334155")
-
-                draw.line([(25, 145), (card_w - 25, 145)], fill="#CBD5E1", width=1)
-
-                cy = 160
-                for lt, vt in details_list:
-                    draw.text((30, cy), f"{lt}  {vt}", fill="#0F172A")
-                    cy += 28
-
-                draw.line([(25, 285), (card_w - 25, 285)], fill="#048D9C", width=1)
-                draw.text((card_w // 2, 305), "Authorized Student Identity", fill="#64748B", anchor="mm")
-
-                card_img.convert("RGB").save(path)
-                show_popup("Student Card downloaded successfully!")
-            except Exception as e:
-                show_popup(f"Error saving card: {str(e)}", is_error=True)
-
-        btn_bar = tk.Frame(content_fm, bg="#F8FAFC")
-        btn_bar.pack(pady=10)
-
-        save_btn = tk.Button(btn_bar, text="💾 Save Card as PNG", font=('Arial', 12, 'bold'), bg="#159BD7", fg="#FFFFFF", bd=0, command=handle_save_card)
-        save_btn.pack(side="left", padx=10, ipady=6, ipadx=12)
-
-        print_btn = tk.Button(btn_bar, text="🖨️ Print Card", font=('Arial', 12, 'bold'), bg="#217A5A", fg="#FFFFFF", bd=0, command=lambda: show_popup("Card ready! Please save as PNG to print."))
-        print_btn.pack(side="left", padx=10, ipady=6, ipadx=12)
+        tk.Button(
+            btn_row,
+            text="💾 Save ID Card as PNG",
+            font=('Arial', 11, 'bold'),
+            bg="#2563EB",
+            fg="#FFFFFF",
+            bd=0,
+            command=save_card,
+        ).pack(side="left", padx=10, ipady=6, ipadx=15)
 
     # ==========================================
-    # TAB 3: EDIT PROFILE (Part 11)
+    # TAB 3: MY ATTENDANCE VIEW (NEW! #humanrised)
+    # ==========================================
+    def show_attendance_view():
+        clear_content()
+        set_active_button("attendance")
+
+        title = tk.Label(content_fm, text="My Attendance & Performance Record", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A")
+        title.pack(anchor="w", pady=(0, 12))
+
+        # Fetch attendance stats from database
+        summary = get_student_attendance_summary(current_student[0])
+        total_days = summary["total_days"]
+        present_days = summary["present_days"]
+        absent_days = summary["absent_days"]
+        leave_days = summary["leave_days"]
+        pct = summary["percentage"]
+
+        # Metric Cards Container
+        metrics_fm = tk.Frame(content_fm, bg="#F8FAFC")
+        metrics_fm.pack(fill="x", pady=(0, 15))
+
+        # Color based on 75% requirement
+        pct_color = "#16A34A" if pct >= 75.0 else "#DC2626"
+        alert_msg = "🟢 Status: Good Standing" if pct >= 75.0 else "⚠️ Warning: Below 75% Requirement"
+
+        # Big Percentage Box
+        pct_card = tk.Frame(metrics_fm, bg="#FFFFFF", bd=1, relief="solid", width=190, height=95)
+        pct_card.pack_propagate(False)
+        pct_card.pack(side="left", padx=(0, 10))
+
+        tk.Frame(pct_card, bg=pct_color, height=4).pack(fill="x", side="top")
+        tk.Label(pct_card, text="ATTENDANCE RATE", font=('Arial', 9, 'bold'), bg="#FFFFFF", fg="#64748B").pack(pady=(8, 2))
+        tk.Label(pct_card, text=f"{pct:.1f}%", font=('Arial', 22, 'bold'), bg="#FFFFFF", fg=pct_color).pack()
+        tk.Label(pct_card, text=alert_msg, font=('Arial', 8, 'bold'), bg="#FFFFFF", fg=pct_color).pack()
+
+        # Breakdown Cards
+        def create_att_card(parent, label_text, count_val, fg_col):
+            c = tk.Frame(parent, bg="#FFFFFF", bd=1, relief="solid", width=125, height=95)
+            c.pack_propagate(False)
+            tk.Frame(c, bg=fg_col, height=4).pack(fill="x", side="top")
+            tk.Label(c, text=label_text, font=('Arial', 9, 'bold'), bg="#FFFFFF", fg="#64748B").pack(pady=(12, 4))
+            tk.Label(c, text=str(count_val), font=('Arial', 20, 'bold'), bg="#FFFFFF", fg=fg_col).pack()
+            return c
+
+        create_att_card(metrics_fm, "Total Days", total_days, "#2563EB").pack(side="left", padx=5)
+        create_att_card(metrics_fm, "Present", present_days, "#16A34A").pack(side="left", padx=5)
+        create_att_card(metrics_fm, "Absent", absent_days, "#DC2626").pack(side="left", padx=5)
+        create_att_card(metrics_fm, "On Leave", leave_days, "#D97706").pack(side="left", padx=5)
+
+        # Recent Logs Table
+        tk.Label(content_fm, text="Recent Attendance Log", font=('Arial', 12, 'bold'), bg="#F8FAFC", fg="#1E293B").pack(anchor="w", pady=(5, 5))
+
+        tree_frame = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
+        tree_frame.pack(fill="both", expand=True)
+
+        history = get_student_attendance_history(current_student[0], limit=40)
+
+        tree = ttk.Treeview(tree_frame, columns=("date", "status", "class"), show="headings", height=8)
+        tree.heading("date", text="Date (YYYY-MM-DD)")
+        tree.heading("status", text="Attendance Status")
+        tree.heading("class", text="Academic Class")
+
+        tree.column("date", width=180, anchor="center")
+        tree.column("status", width=200, anchor="center")
+        tree.column("class", width=180, anchor="center")
+
+        tree_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=tree_scroll.set)
+        tree.pack(side="left", fill="both", expand=True)
+        tree_scroll.pack(side="right", fill="y")
+
+        if not history:
+            tree.insert("", "end", values=("No records yet", "Attendance not yet marked by admin", current_student[6]))
+        else:
+            for d_val, s_val, c_val in history:
+                tag = "p" if s_val == "Present" else ("a" if s_val == "Absent" else "l")
+                tree.insert("", "end", values=(d_val, s_val, c_val), tags=(tag,))
+
+        tree.tag_configure("p", foreground="#16A34A")
+        tree.tag_configure("a", foreground="#DC2626")
+        tree.tag_configure("l", foreground="#D97706")
+
+    # ==========================================
+    # TAB 4: EXAM RESULTS & REPORT CARD (NEW! #humanrised)
+    # ==========================================
+    def show_results_view():
+        clear_content()
+        set_active_button("results")
+
+        title = tk.Label(content_fm, text="Academic Examinations & Grade Cards", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A")
+        title.pack(anchor="w", pady=(0, 10))
+
+        records = get_student_marks(current_student[0])
+
+        if not records:
+            card = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
+            card.pack(fill="both", expand=True, pady=10)
+            tk.Label(card, text="📝 No examination results published yet.", font=('Arial', 13, 'bold'), bg="#FFFFFF", fg="#64748B").pack(pady=40)
+            tk.Label(card, text="Your examination marks and official grade cards will appear here once entered by the faculty.", font=('Arial', 10), bg="#FFFFFF", fg="#94A3B8").pack()
+            return
+
+        # Scrollable container for exams
+        outer_fm = tk.Frame(content_fm, bg="#F8FAFC")
+        outer_fm.pack(fill="both", expand=True)
+
+        for exam in records:
+            # exam: (id, exam_name, s1, m1, s2, m2, s3, m3, s4, m4, s5, m5, total, percentage, grade, exam_date)
+            exam_name = exam[1]
+            total = exam[12]
+            pct = exam[13]
+            grade = exam[14]
+            edate = exam[15]
+
+            exam_card = tk.Frame(outer_fm, bg="#FFFFFF", bd=1, relief="solid")
+            exam_card.pack(fill="x", pady=8, padx=2)
+
+            top_row = tk.Frame(exam_card, bg="#F8FAFC")
+            top_row.pack(fill="x", padx=15, pady=(10, 6))
+
+            tk.Label(top_row, text=f"🎓 {exam_name}", font=('Arial', 13, 'bold'), bg="#F8FAFC", fg="#1E3A5F").pack(side="left")
+            tk.Label(top_row, text=f"Date: {edate}", font=('Arial', 10), bg="#F8FAFC", fg="#64748B").pack(side="right")
+
+            # Metrics row
+            metrics_row = tk.Frame(exam_card, bg="#FFFFFF")
+            metrics_row.pack(fill="x", padx=15, pady=6)
+
+            tk.Label(metrics_row, text=f"Total: {total:.1f}/500", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#1E293B").pack(side="left", padx=(0, 20))
+            tk.Label(metrics_row, text=f"Percentage: {pct:.1f}%", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#2563EB").pack(side="left", padx=(0, 20))
+            tk.Label(metrics_row, text=f"Grade: {grade}", font=('Arial', 12, 'bold'), bg="#FFFFFF", fg="#16A34A").pack(side="left")
+
+            # Action button
+            def download_report(rec=exam):
+                preview_report_card_window(root, current_student[0], rec)
+
+            tk.Button(
+                metrics_row,
+                text="📄 View & Download Official Marksheet",
+                font=('Arial', 10, 'bold'),
+                bg="#10B981",
+                fg="#FFFFFF",
+                bd=0,
+                command=download_report,
+            ).pack(side="right", ipady=4, ipadx=10)
+
+    # ==========================================
+    # TAB 5: EDIT PROFILE (Part 11)
     # ==========================================
     def show_edit_profile_view():
         clear_content()
         set_active_button("edit")
 
-        title = tk.Label(content_fm, text="Edit Profile Information", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A")
-        title.pack(anchor="w", pady=(0, 15))
+        title = tk.Label(content_fm, text="Edit Personal Details", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A")
+        title.pack(anchor="w", pady=(0, 10))
 
         card = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
         card.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Selected Image state for editing
-        edit_pic_data = [None]  # holds new binary pic if changed
-
-        top_edit_bar = tk.Frame(card, bg="#FFFFFF")
-        top_edit_bar.pack(fill="x", padx=25, pady=15)
-
-        edit_avatar_canvas = tk.Canvas(top_edit_bar, width=80, height=80, bg="#FFFFFF", bd=0, highlightthickness=0)
-        edit_avatar_canvas.pack(side="left", padx=(0, 15))
-
-        def update_edit_avatar_preview(p_img):
-            c_img = make_circular_image(p_img, size=(75, 75))
-            tk_c = ImageTk.PhotoImage(c_img)
-            card._preview_tk = tk_c
-            edit_avatar_canvas.delete("all")
-            edit_avatar_canvas.create_image(40, 40, image=tk_c)
-
-        update_edit_avatar_preview(get_profile_pil())
-
-        def handle_change_photo():
-            from creat_account_page import pick_image_file
-            path = pick_image_file(root)
-            if path:
-                try:
-                    with Image.open(path) as raw_img:
-                        resized = raw_img.convert("RGBA").resize((100, 100), Image.Resampling.LANCZOS)
-                        buffer = io.BytesIO()
-                        resized.save(buffer, format="PNG")
-                        edit_pic_data[0] = buffer.getvalue()
-                        update_edit_avatar_preview(resized)
-                except Exception as e:
-                    show_popup(f"Error loading image: {str(e)}", is_error=True)
-
-        change_photo_btn = tk.Button(
-            top_edit_bar,
-            text="📷 Change Profile Photo",
-            font=('Arial', 10, 'bold'),
-            bg="#2563EB",
-            fg="#FFFFFF",
-            bd=0,
-            command=handle_change_photo,
-        )
-        change_photo_btn.pack(side="left", padx=10, ipady=4, ipadx=8)
-
-        # Inputs Form
         form_fm = tk.Frame(card, bg="#FFFFFF")
-        form_fm.pack(fill="both", expand=True, padx=25, pady=5)
+        form_fm.pack(fill="both", expand=True, padx=30, pady=20)
 
-        # Full Name
-        tk.Label(form_fm, text="Full Name:", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#334155").grid(row=0, column=0, sticky="w", pady=6)
-        name_ent = tk.Entry(form_fm, font=('Arial', 11), width=35)
+        # Name
+        tk.Label(form_fm, text="Full Name:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=0, column=0, sticky="w", pady=8)
+        name_ent = tk.Entry(form_fm, font=('Arial', 10), width=35)
+        name_ent.grid(row=0, column=1, sticky="w", padx=10, pady=8)
         name_ent.insert(0, current_student[2])
-        name_ent.grid(row=0, column=1, sticky="w", padx=10, pady=6)
 
         # Age
-        tk.Label(form_fm, text="Age:", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#334155").grid(row=1, column=0, sticky="w", pady=6)
-        age_ent = tk.Entry(form_fm, font=('Arial', 11), width=35)
+        tk.Label(form_fm, text="Age:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=1, column=0, sticky="w", pady=8)
+        age_ent = tk.Entry(form_fm, font=('Arial', 10), width=35)
+        age_ent.grid(row=1, column=1, sticky="w", padx=10, pady=8)
         age_ent.insert(0, current_student[3])
-        age_ent.grid(row=1, column=1, sticky="w", padx=10, pady=6)
 
-        # Gender
-        tk.Label(form_fm, text="Gender:", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#334155").grid(row=2, column=0, sticky="w", pady=6)
-        gender_var = tk.StringVar(value=current_student[4])
-        gender_combo = ttk.Combobox(form_fm, textvariable=gender_var, values=["Male", "Female", "Other"], state="readonly", font=('Arial', 10), width=33)
-        gender_combo.grid(row=2, column=1, sticky="w", padx=10, pady=6)
-
-        # Phone
-        tk.Label(form_fm, text="Contact No:", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#334155").grid(row=3, column=0, sticky="w", pady=6)
-        phone_ent = tk.Entry(form_fm, font=('Arial', 11), width=35)
+        # Phone Number
+        tk.Label(form_fm, text="Phone Number:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=2, column=0, sticky="w", pady=8)
+        phone_ent = tk.Entry(form_fm, font=('Arial', 10), width=35)
+        phone_ent.grid(row=2, column=1, sticky="w", padx=10, pady=8)
         phone_ent.insert(0, current_student[5])
-        phone_ent.grid(row=3, column=1, sticky="w", padx=10, pady=6)
 
-        # Class Year
-        tk.Label(form_fm, text="Year / Class:", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#334155").grid(row=4, column=0, sticky="w", pady=6)
+        # Class / Year
+        tk.Label(form_fm, text="Class / Year:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=3, column=0, sticky="w", pady=8)
         class_var = tk.StringVar(value=current_student[6])
-        class_combo = ttk.Combobox(form_fm, textvariable=class_var, values=["1st year", "2nd year", "3rd year", "4th year"], state="readonly", font=('Arial', 10), width=33)
-        class_combo.grid(row=4, column=1, sticky="w", padx=10, pady=6)
+        class_cb = ttk.Combobox(form_fm, textvariable=class_var, values=["1st year", "2nd year", "3rd year", "4th year"], state="readonly", width=33)
+        class_cb.grid(row=3, column=1, sticky="w", padx=10, pady=8)
 
-        # Email
-        tk.Label(form_fm, text="Email Address:", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#334155").grid(row=5, column=0, sticky="w", pady=6)
-        email_ent = tk.Entry(form_fm, font=('Arial', 11), width=35)
-        email_ent.insert(0, current_student[7])
-        email_ent.grid(row=5, column=1, sticky="w", padx=10, pady=6)
+        # Change Photo Box
+        new_photo_data = [None]
+        photo_status_lbl = tk.Label(form_fm, text="No new photo chosen", font=('Arial', 9, 'italic'), bg="#FFFFFF", fg="#64748B")
+
+        def handle_pick_photo():
+            path = filedialog.askopenfilename(
+                title="Select Student Photo",
+                filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp")]
+            )
+            if path:
+                try:
+                    with open(path, "rb") as f:
+                        new_photo_data[0] = f.read()
+                    photo_status_lbl.config(text=f"Selected: {os.path.basename(path)}", fg="#16A34A")
+                except Exception as e:
+                    show_popup(f"Failed to load image: {str(e)}", is_error=True)
+
+        tk.Label(form_fm, text="Profile Photo:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=4, column=0, sticky="w", pady=8)
+        photo_btn_row = tk.Frame(form_fm, bg="#FFFFFF")
+        photo_btn_row.grid(row=4, column=1, sticky="w", padx=10, pady=8)
+
+        tk.Button(
+            photo_btn_row,
+            text="📁 Change Photo...",
+            font=('Arial', 9, 'bold'),
+            bg="#0284C7",
+            fg="#FFFFFF",
+            bd=0,
+            command=handle_pick_photo,
+        ).pack(side="left")
+        photo_status_lbl.pack(side="left", padx=10)
 
         def handle_save_profile():
             n = name_ent.get().strip()
             a = age_ent.get().strip()
-            g = gender_var.get().strip()
             p = phone_ent.get().strip()
             c = class_var.get().strip()
-            e = email_ent.get().strip()
 
-            if not n or not a or not p or not c or not e:
-                show_popup("Please fill in all profile fields", is_error=True)
+            if not n or not a or not p or not c:
+                show_popup("All fields are required!", is_error=True)
                 return
 
             try:
+                pic_to_save = new_photo_data[0] if new_photo_data[0] else current_student[8]
                 update_student(
                     id_number=current_student[0],
                     name=n,
                     age=a,
-                    gender=g,
+                    gender=current_student[4],
                     phone_number=p,
                     student_class=c,
-                    email=e,
-                    pic_data=edit_pic_data[0]
+                    email=current_student[7],
+                    pic_data=pic_to_save
                 )
-                # Refresh local state
                 current_student[2] = n
                 current_student[3] = a
-                current_student[4] = g
                 current_student[5] = p
                 current_student[6] = c
-                current_student[7] = e
-                if edit_pic_data[0]:
-                    current_student[8] = edit_pic_data[0]
+                if new_photo_data[0]:
+                    current_student[8] = new_photo_data[0]
 
-                refresh_sidebar_avatar()
+                welcome_user_lb.config(text=f"Welcome, {n}!")
+                sidebar_name_lb.config(text=n)
+                sidebar_class_lb.config(text=f"Class: {c}")
+                update_sidebar_avatar()
                 show_popup("Profile updated successfully!")
-            except Exception as err:
-                show_popup(f"Failed to update profile: {str(err)}", is_error=True)
+            except Exception as e:
+                show_popup(f"Failed to update profile: {str(e)}", is_error=True)
 
         save_btn = tk.Button(
             card,
             text="💾 Save Changes",
-            font=('Arial', 12, 'bold'),
+            font=('Arial', 11, 'bold'),
             bg="#16A34A",
             fg="#FFFFFF",
             bd=0,
             command=handle_save_profile,
         )
-        save_btn.pack(pady=15, ipady=5, ipadx=15)
+        save_btn.pack(pady=10, ipady=5, ipadx=15)
 
     # ==========================================
-    # TAB 4: CHANGE PASSWORD (Part 11)
+    # TAB 6: SECURITY / CHANGE PASSWORD (Part 11)
     # ==========================================
     def show_change_password_view():
         clear_content()
         set_active_button("password")
 
-        title = tk.Label(content_fm, text="Security & Password Management", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A")
-        title.pack(anchor="w", pady=(0, 15))
+        title = tk.Label(content_fm, text="Security & Password Settings", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A")
+        title.pack(anchor="w", pady=(0, 10))
 
         card = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
         card.pack(fill="both", expand=True, padx=5, pady=5)
 
-        form = tk.Frame(card, bg="#FFFFFF")
-        form.pack(padx=30, pady=30)
+        form_fm = tk.Frame(card, bg="#FFFFFF")
+        form_fm.pack(padx=30, pady=20)
 
         # Current Password
-        tk.Label(form, text="Current Password:", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#334155").grid(row=0, column=0, sticky="w", pady=10)
-        curr_pwd_ent = tk.Entry(form, font=('Arial', 12), show='*', width=25)
+        tk.Label(form_fm, text="Current Password:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=0, column=0, sticky="w", pady=10)
+        curr_pwd_ent = tk.Entry(form_fm, font=('Arial', 11), show="•", width=25)
         curr_pwd_ent.grid(row=0, column=1, sticky="w", padx=10, pady=10)
 
         # New Password
-        tk.Label(form, text="New Password:", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#334155").grid(row=1, column=0, sticky="w", pady=10)
-        new_pwd_ent = tk.Entry(form, font=('Arial', 12), show='*', width=25)
+        tk.Label(form_fm, text="New Password:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=1, column=0, sticky="w", pady=10)
+        new_pwd_ent = tk.Entry(form_fm, font=('Arial', 11), show="•", width=25)
         new_pwd_ent.grid(row=1, column=1, sticky="w", padx=10, pady=10)
 
         # Confirm Password
-        tk.Label(form, text="Confirm New Password:", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#334155").grid(row=2, column=0, sticky="w", pady=10)
-        conf_pwd_ent = tk.Entry(form, font=('Arial', 12), show='*', width=25)
+        tk.Label(form_fm, text="Confirm Password:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=2, column=0, sticky="w", pady=10)
+        conf_pwd_ent = tk.Entry(form_fm, font=('Arial', 11), show="•", width=25)
         conf_pwd_ent.grid(row=2, column=1, sticky="w", padx=10, pady=10)
 
-        # Show/Hide Toggle
-        def toggle_pwds():
-            s = '' if curr_pwd_ent['show'] == '*' else '*'
-            curr_pwd_ent.config(show=s)
-            new_pwd_ent.config(show=s)
-            conf_pwd_ent.config(show=s)
-
-        eye_btn = tk.Button(form, text="👁️ Toggle Password Visibility", font=('Arial', 10), bg="#E2E8F0", bd=0, command=toggle_pwds)
-        eye_btn.grid(row=3, column=1, sticky="w", padx=10, pady=5)
-
         def handle_pwd_update():
-            c_p = curr_pwd_ent.get().strip()
-            n_p = new_pwd_ent.get().strip()
-            cf_p = conf_pwd_ent.get().strip()
-
-            if not c_p or not n_p or not cf_p:
-                show_popup("Please fill out all password fields", is_error=True)
-                return
+            c_p = curr_pwd_ent.get()
+            n_p = new_pwd_ent.get()
+            cf_p = conf_pwd_ent.get()
 
             if c_p != current_student[1]:
                 show_popup("Incorrect Current Password!", is_error=True)
@@ -576,7 +606,7 @@ def start_student_dashboard_page(root, student_data):
         up_btn = tk.Button(
             card,
             text="🔒 Update Password",
-            font=('Arial', 12, 'bold'),
+            font=('Arial', 11, 'bold'),
             bg="#2563EB",
             fg="#FFFFFF",
             bd=0,
@@ -585,7 +615,7 @@ def start_student_dashboard_page(root, student_data):
         up_btn.pack(pady=10, ipady=5, ipadx=15)
 
     # ==========================================
-    # TAB 5: ANNOUNCEMENTS VIEW (Part 13B)
+    # TAB 7: ANNOUNCEMENTS VIEW (Part 13B)
     # ==========================================
     def show_announcements_view():
         clear_content()
@@ -654,6 +684,8 @@ def start_student_dashboard_page(root, student_data):
     nav_items = [
         ("profile", "👤  My Profile", show_profile_view),
         ("card", "🪪  My ID Card", show_id_card_view),
+        ("attendance", "📅  My Attendance", show_attendance_view),
+        ("results", "📝  Exam Results", show_results_view),
         ("edit", "✏️  Edit Profile", show_edit_profile_view),
         ("password", "🔒  Security", show_change_password_view),
         ("announcements", "📢  Notices", show_announcements_view),
@@ -671,10 +703,10 @@ def start_student_dashboard_page(root, student_data):
             bd=0,
             relief='flat',
             anchor="w",
-            padx=20,
+            padx=18,
             command=cmd,
         )
-        btn.pack(fill="x", pady=2, ipady=6)
+        btn.pack(fill="x", pady=2, ipady=5)
         nav_buttons[key] = btn
 
     # Logout Button at bottom of sidebar
@@ -688,10 +720,10 @@ def start_student_dashboard_page(root, student_data):
         activeforeground="#FFFFFF",
         bd=0,
         anchor="w",
-        padx=20,
+        padx=18,
         command=handle_logout,
     )
-    logout_btn.pack(side="bottom", fill="x", pady=20, ipady=6)
+    logout_btn.pack(side="bottom", fill="x", pady=15, ipady=6)
 
     # Initial View
     show_profile_view()

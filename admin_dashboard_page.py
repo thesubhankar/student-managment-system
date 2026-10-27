@@ -1,10 +1,12 @@
 """
-Student Management System - Admin Dashboard
-Comprehensive administrative control panel matching Tkinter Hub Parts 12, 13A, and 13B:
+Student Management System - Admin Dashboard #humanrised
+Comprehensive administrative control panel matching Tkinter Hub Parts 12, 13A, 13B,
+with extended modules for:
 - Dashboard Metrics (Total Students & Counts by Year)
-- Find & Manage Students (Search, Live Treeview table, Photo Preview)
-- Edit & Delete Student records
-- View / Generate & Print Student ID Cards from Admin Panel
+- Student Directory (Search, Live Treeview table, Photo Preview, Edit, Delete, View ID Card)
+- Attendance Management (Mark daily attendance, Mark All Present, Save, Export)
+- Examination Marks & Results (Input marks, Grade calculation, View & Download Official Report Card)
+- Excel Data Hub (Export Students, Attendance, Results to Excel & Bulk Import from Excel/CSV)
 - Broadcast Announcements to All Students or Specific Classes
 - Logout
 """
@@ -23,8 +25,16 @@ from database import (
     update_student,
     delete_student,
     add_announcement,
-    get_announcements
+    get_announcements,
+    mark_attendance,
+    get_attendance_for_date_and_class,
+    save_or_update_marks,
+    get_marks_by_exam_and_class,
+    delete_marks_record,
+    calculate_grade
 )
+import excel_manager
+from report_card_generator import preview_report_card_window
 
 BASE_DIR = os.path.dirname(__file__)
 IMAGES_DIR = os.path.join(BASE_DIR, 'Images')
@@ -34,8 +44,8 @@ def start_admin_dashboard_page(root):
     """
     Renders the Administrator Dashboard.
     """
-    # Expand window for table and sidebar
-    root.geometry("1020x660")
+    # Expand window for table, attendance, and sidebar
+    root.geometry("1060x680")
     root.title("Student Management System - Administrator Dashboard")
 
     # Load UI Icons
@@ -68,7 +78,7 @@ def start_admin_dashboard_page(root):
     body_fm.pack(fill="both", expand=True)
 
     # Left Navigation Sidebar
-    sidebar_fm = tk.Frame(body_fm, bg="#0F172A", width=220)
+    sidebar_fm = tk.Frame(body_fm, bg="#0F172A", width=225)
     sidebar_fm.pack(side="left", fill="y")
     sidebar_fm.pack_propagate(False)
 
@@ -78,12 +88,12 @@ def start_admin_dashboard_page(root):
         image=admin_icon,
         bg="#0F172A",
         bd=0,
-    ).pack(pady=(20, 5))
+    ).pack(pady=(16, 4))
 
     tk.Label(
         sidebar_fm,
         text="Administrator",
-        font=('Arial', 13, 'bold'),
+        font=('Arial', 12, 'bold'),
         bg="#0F172A",
         fg="#FFFFFF",
     ).pack()
@@ -94,13 +104,13 @@ def start_admin_dashboard_page(root):
         font=('Arial', 9),
         bg="#0F172A",
         fg="#94A3B8",
-    ).pack(pady=(0, 15))
+    ).pack(pady=(0, 10))
 
-    tk.Frame(sidebar_fm, bg="#334155", height=1).pack(fill="x", padx=15, pady=(0, 15))
+    tk.Frame(sidebar_fm, bg="#334155", height=1).pack(fill="x", padx=15, pady=(0, 8))
 
     # Content Area (Right Side)
     content_fm = tk.Frame(body_fm, bg="#F8FAFC")
-    content_fm.pack(side="right", fill="both", expand=True, padx=15, pady=15)
+    content_fm.pack(side="right", fill="both", expand=True, padx=12, pady=12)
 
     nav_buttons = {}
 
@@ -134,27 +144,22 @@ def start_admin_dashboard_page(root):
         cards_fm = tk.Frame(content_fm, bg="#F8FAFC")
         cards_fm.pack(fill="x", pady=10)
 
-        # Card Template Helper
-        def create_metric_card(parent, title_text, count_val, bg_color, fg_accent):
-            card = tk.Frame(parent, bg="#FFFFFF", bd=1, relief="solid", highlightthickness=0, width=140, height=110)
+        def create_metric_card(parent, title_text, count_val, fg_accent):
+            card = tk.Frame(parent, bg="#FFFFFF", bd=1, relief="solid", highlightthickness=0, width=145, height=105)
             card.pack_propagate(False)
-
-            strip = tk.Frame(card, bg=fg_accent, height=4)
-            strip.pack(fill="x", side="top")
-
-            tk.Label(card, text=title_text, font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#64748B").pack(pady=(12, 4))
+            tk.Frame(card, bg=fg_accent, height=4).pack(fill="x", side="top")
+            tk.Label(card, text=title_text, font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#64748B").pack(pady=(10, 4))
             tk.Label(card, text=str(count_val), font=('Arial', 24, 'bold'), bg="#FFFFFF", fg=fg_accent).pack()
             return card
 
-        # Total Students Metric Card (Bigger)
-        total_card = tk.Frame(cards_fm, bg="#FFFFFF", bd=1, relief="solid", width=180, height=110)
+        # Total Students Metric Card
+        total_card = tk.Frame(cards_fm, bg="#FFFFFF", bd=1, relief="solid", width=180, height=105)
         total_card.pack_propagate(False)
-        total_card.pack(side="left", padx=8)
+        total_card.pack(side="left", padx=6)
         tk.Frame(total_card, bg="#2563EB", height=4).pack(fill="x", side="top")
-        tk.Label(total_card, text="TOTAL STUDENTS", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#64748B").pack(pady=(12, 4))
+        tk.Label(total_card, text="TOTAL STUDENTS", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#64748B").pack(pady=(10, 4))
         tk.Label(total_card, text=str(total_count), font=('Arial', 26, 'bold'), bg="#FFFFFF", fg="#2563EB").pack()
 
-        # Breakdown by Class Year Cards
         colors = [
             ("1st Year", class_counts.get("1st year", 0), "#16A34A"),
             ("2nd Year", class_counts.get("2nd year", 0), "#9333EA"),
@@ -163,10 +168,10 @@ def start_admin_dashboard_page(root):
         ]
 
         for year_name, count_v, accent in colors:
-            c = create_metric_card(cards_fm, f"{year_name}", count_v, "#FFFFFF", accent)
-            c.pack(side="left", padx=8)
+            c = create_metric_card(cards_fm, year_name, count_v, accent)
+            c.pack(side="left", padx=6)
 
-        # Quick Actions & Summary Box
+        # Quick Actions Box
         info_card = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
         info_card.pack(fill="both", expand=True, pady=15)
 
@@ -176,332 +181,674 @@ def start_admin_dashboard_page(root):
         btn_grid = tk.Frame(info_card, bg="#FFFFFF")
         btn_grid.pack(anchor="w", padx=20, pady=5)
 
-        tk.Button(
-            btn_grid,
-            text="📋 Find & Manage Students",
-            font=('Arial', 11, 'bold'),
-            bg="#1E3A5F",
-            fg="#FFFFFF",
-            bd=0,
-            command=show_students_table_view,
-        ).grid(row=0, column=0, padx=8, pady=8, ipady=8, ipadx=14)
+        tk.Button(btn_grid, text="📋 Manage Students", font=('Arial', 11, 'bold'), bg="#1E3A5F", fg="#FFFFFF", bd=0,
+                  command=show_students_table_view).grid(row=0, column=0, padx=8, pady=8, ipady=8, ipadx=14)
 
-        tk.Button(
-            btn_grid,
-            text="📢 Publish College Notice",
-            font=('Arial', 11, 'bold'),
-            bg="#2563EB",
-            fg="#FFFFFF",
-            bd=0,
-            command=show_announcements_view,
-        ).grid(row=0, column=1, padx=8, pady=8, ipady=8, ipadx=14)
+        tk.Button(btn_grid, text="📅 Mark Attendance", font=('Arial', 11, 'bold'), bg="#0284C7", fg="#FFFFFF", bd=0,
+                  command=show_attendance_view).grid(row=0, column=1, padx=8, pady=8, ipady=8, ipadx=14)
 
-        def handle_admin_add_student():
-            header_fm.destroy()
-            body_fm.destroy()
-            root.geometry("500x600")
-            root.update()
-            from creat_account_page import start_creat_account_page
-            start_creat_account_page(root)
+        tk.Button(btn_grid, text="📝 Exams & Marksheets", font=('Arial', 11, 'bold'), bg="#16A34A", fg="#FFFFFF", bd=0,
+                  command=show_marks_view).grid(row=0, column=2, padx=8, pady=8, ipady=8, ipadx=14)
 
-        tk.Button(
-            btn_grid,
-            text="➕ Register New Student",
-            font=('Arial', 11, 'bold'),
-            bg="#16A34A",
-            fg="#FFFFFF",
-            bd=0,
-            command=handle_admin_add_student,
-        ).grid(row=0, column=2, padx=8, pady=8, ipady=8, ipadx=14)
-
-        # Status text
-        tk.Label(
-            info_card,
-            text="Database Status: SQLite3 (student_account.db) Active & Synchronized\nID Card Generation System: Operational",
-            font=('Arial', 10),
-            bg="#FFFFFF",
-            fg="#64748B",
-            justify="left",
-        ).pack(anchor="w", padx=25, pady=25)
+        tk.Button(btn_grid, text="📊 Excel Hub & Import", font=('Arial', 11, 'bold'), bg="#D97706", fg="#FFFFFF", bd=0,
+                  command=show_excel_center_view).grid(row=0, column=3, padx=8, pady=8, ipady=8, ipadx=14)
 
     # ==========================================
-    # TAB 2: FIND & MANAGE STUDENTS (Part 13A)
+    # TAB 2: MANAGE STUDENTS TABLE (Part 13A)
     # ==========================================
     def show_students_table_view():
         clear_content()
         set_active_btn("students")
 
-        top_search = tk.Frame(content_fm, bg="#F8FAFC")
-        top_search.pack(fill="x", pady=(0, 10))
+        top_bar = tk.Frame(content_fm, bg="#F8FAFC")
+        top_bar.pack(fill="x", pady=(0, 10))
 
-        tk.Label(top_search, text="Manage Students", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A").pack(side="left")
+        tk.Label(top_bar, text="Student Directory & Management", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A").pack(side="left")
 
-        # Search Controls
-        search_box = tk.Frame(top_search, bg="#F8FAFC")
-        search_box.pack(side="right")
+        search_bar = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
+        search_bar.pack(fill="x", pady=(0, 10), ipady=6, ipadx=10)
 
-        search_ent = tk.Entry(search_box, font=('Arial', 11), width=26)
-        search_ent.pack(side="left", padx=6, ipady=4)
+        tk.Label(search_bar, text="🔍 Search:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").pack(side="left", padx=(10, 5))
+        search_ent = tk.Entry(search_bar, font=('Arial', 10), width=28)
+        search_ent.pack(side="left", padx=5)
 
-        def do_search():
-            kw = search_ent.get().strip()
-            if kw:
-                results = search_students(kw)
+        def handle_search(*args):
+            query = search_ent.get().strip()
+            if not query:
+                load_tree_data(get_all_students())
             else:
-                results = get_all_students()
-            load_tree_data(results)
+                load_tree_data(search_students(query))
 
-        search_btn = tk.Button(search_box, text="🔍 Search", font=('Arial', 10, 'bold'), bg="#2563EB", fg="#FFFFFF", bd=0, command=do_search)
-        search_btn.pack(side="left", padx=4, ipady=3, ipadx=8)
+        search_ent.bind("<KeyRelease>", handle_search)
 
-        reset_btn = tk.Button(search_box, text="🔄 Reset", font=('Arial', 10), bg="#E2E8F0", fg="#0F172A", bd=0, command=lambda: [search_ent.delete(0, tk.END), load_tree_data(get_all_students())])
-        reset_btn.pack(side="left", padx=4, ipady=3, ipadx=6)
+        tk.Button(search_bar, text="Search", font=('Arial', 9, 'bold'), bg="#2563EB", fg="#FFFFFF", bd=0,
+                  command=handle_search).pack(side="left", padx=5, ipadx=10)
 
-        # Main Table + Preview Split Layout
+        tk.Button(search_bar, text="Reset", font=('Arial', 9), bg="#94A3B8", fg="#FFFFFF", bd=0,
+                  command=lambda: (search_ent.delete(0, tk.END), load_tree_data(get_all_students()))).pack(side="left", padx=5, ipadx=8)
+
+        # Split Container: Treeview (Left) + Selected Preview (Right)
         split_fm = tk.Frame(content_fm, bg="#F8FAFC")
         split_fm.pack(fill="both", expand=True)
 
-        # Treeview Container
-        tree_fm = tk.Frame(split_fm, bg="#FFFFFF", bd=1, relief="solid")
-        tree_fm.pack(side="left", fill="both", expand=True)
+        tree_frame = tk.Frame(split_fm, bg="#FFFFFF", bd=1, relief="solid")
+        tree_frame.pack(side="left", fill="both", expand=True)
 
-        cols = ("id", "name", "class", "gender", "age", "phone", "email")
-        tree = ttk.Treeview(tree_fm, columns=cols, show="headings", selectmode="browse")
+        cols = ("id", "name", "class", "gender", "phone", "email")
+        tree = ttk.Treeview(tree_frame, columns=cols, show="headings", selectmode="browse")
 
         tree.heading("id", text="Student ID")
         tree.heading("name", text="Full Name")
         tree.heading("class", text="Class / Year")
         tree.heading("gender", text="Gender")
-        tree.heading("age", text="Age")
-        tree.heading("phone", text="Contact No")
-        tree.heading("email", text="Email ID")
+        tree.heading("phone", text="Phone")
+        tree.heading("email", text="Email")
 
-        tree.column("id", width=105, anchor="center")
+        tree.column("id", width=95, anchor="center")
         tree.column("name", width=130, anchor="w")
         tree.column("class", width=85, anchor="center")
-        tree.column("gender", width=65, anchor="center")
-        tree.column("age", width=45, anchor="center")
-        tree.column("phone", width=100, anchor="center")
-        tree.column("email", width=150, anchor="w")
+        tree.column("gender", width=70, anchor="center")
+        tree.column("phone", width=95, anchor="center")
+        tree.column("email", width=140, anchor="w")
 
-        scroll_y = ttk.Scrollbar(tree_fm, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=scroll_y.set)
-        scroll_y.pack(side="right", fill="y")
-        tree.pack(fill="both", expand=True)
+        v_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=v_scroll.set)
+        tree.pack(side="left", fill="both", expand=True)
+        v_scroll.pack(side="right", fill="y")
 
-        # Side Preview Card (Selected Student Details & Photo)
-        preview_fm = tk.Frame(split_fm, bg="#FFFFFF", bd=1, relief="solid", width=190)
+        # Preview Panel on Right
+        preview_fm = tk.Frame(split_fm, bg="#FFFFFF", bd=1, relief="solid", width=220)
         preview_fm.pack(side="right", fill="y", padx=(10, 0))
         preview_fm.pack_propagate(False)
 
-        tk.Label(preview_fm, text="Student Preview", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#0F172A").pack(pady=(10, 5))
+        tk.Label(preview_fm, text="Student Details", font=('Arial', 11, 'bold'), bg="#FFFFFF", fg="#1E293B").pack(pady=(12, 6))
+        tk.Frame(preview_fm, bg="#E2E8F0", height=1).pack(fill="x", padx=10, pady=(0, 10))
 
-        preview_canvas = tk.Canvas(preview_fm, width=80, height=80, bg="#FFFFFF", bd=0, highlightthickness=0)
-        preview_canvas.pack(pady=5)
+        avatar_lbl = tk.Label(preview_fm, bg="#FFFFFF", bd=0)
+        avatar_lbl.pack(pady=5)
 
-        prev_name_lb = tk.Label(preview_fm, text="Select a student", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#1E3A5F", wraplength=170)
-        prev_name_lb.pack()
+        detail_lbl = tk.Label(preview_fm, text="Select a student to\nview full profile", font=('Arial', 9), bg="#FFFFFF", fg="#64748B", justify="center")
+        detail_lbl.pack(pady=8, padx=10)
 
-        prev_id_lb = tk.Label(preview_fm, text="", font=('Arial', 9), bg="#FFFFFF", fg="#64748B")
-        prev_id_lb.pack(pady=(0, 10))
+        # Action Buttons under preview
+        btn_box = tk.Frame(preview_fm, bg="#FFFFFF")
+        btn_box.pack(side="bottom", fill="x", pady=15, padx=10)
 
-        prev_details_lb = tk.Label(preview_fm, text="", font=('Arial', 9), bg="#FFFFFF", fg="#334155", justify="left", wraplength=170)
-        prev_details_lb.pack(padx=8)
+        selected_student = [None]
 
-        # Store full records mapping by ID
-        records_map = {}
-
-        def load_tree_data(rows):
-            tree.delete(*tree.get_children())
-            records_map.clear()
-            for r in rows:
-                # r: id_number, name, age, gender, phone_number, class, email, image
-                tree.insert("", "end", values=(r[0], r[1], r[5], r[3], r[2], r[4], r[6]))
-                records_map[str(r[0])] = r
-
-            if rows:
-                tree.selection_set(tree.get_children()[0])
-                on_select_row(None)
-
-        def on_select_row(event):
-            selected = tree.selection()
-            if not selected:
+        def on_tree_select(event):
+            sel = tree.selection()
+            if not sel:
                 return
-            vals = tree.item(selected[0], "values")
-            s_id = str(vals[0])
-            rec = records_map.get(s_id)
-            if rec:
-                prev_name_lb.config(text=rec[1])
-                prev_id_lb.config(text=f"ID: {rec[0]}")
-                prev_details_lb.config(text=f"Class: {rec[5]}\nAge: {rec[2]} | {rec[3]}\nPhone: {rec[4]}\nEmail: {rec[6]}")
+            item = tree.item(sel[0])
+            s_id = item["values"][0]
+            st = get_student_by_id(s_id)
+            if not st:
+                return
+            selected_student[0] = st
 
-                # Display student photo
-                img_data = rec[7]
-                pil_img = None
-                if img_data:
-                    try:
-                        pil_img = Image.open(io.BytesIO(img_data)).convert("RGBA").resize((76, 76), Image.Resampling.LANCZOS)
-                    except Exception:
-                        pass
-                if not pil_img:
-                    d_path = os.path.join(IMAGES_DIR, 'add_student_img.png')
-                    if os.path.exists(d_path):
-                        pil_img = Image.open(d_path).convert("RGBA").resize((76, 76), Image.Resampling.LANCZOS)
-                    else:
-                        pil_img = Image.new("RGBA", (76, 76), color="#E2E8F0")
+            # Render Photo
+            if st[8]:
+                try:
+                    pil_img = Image.open(io.BytesIO(st[8])).convert("RGBA").resize((75, 75), Image.Resampling.LANCZOS)
+                    tk_img = ImageTk.PhotoImage(pil_img)
+                    avatar_lbl.config(image=tk_img)
+                    avatar_lbl.image = tk_img
+                except Exception:
+                    avatar_lbl.config(image="", text="👤")
+            else:
+                avatar_lbl.config(image="", text="👤")
 
-                tk_img = ImageTk.PhotoImage(pil_img)
-                preview_fm._prev_img = tk_img
-                preview_canvas.delete("all")
-                preview_canvas.create_image(40, 40, image=tk_img)
+            txt = f"Name: {st[2]}\nID: {st[0]}\nClass: {st[6]}\nAge: {st[3]} | Gender: {st[4]}\nPhone: {st[5]}\nEmail: {st[7]}"
+            detail_lbl.config(text=txt, justify="left", fg="#1E293B", font=('Arial', 9))
 
-        tree.bind("<<TreeviewSelect>>", on_select_row)
+        tree.bind("<<TreeviewSelect>>", on_tree_select)
 
-        # Action Buttons Row
-        actions_bar = tk.Frame(content_fm, bg="#F8FAFC")
-        actions_bar.pack(fill="x", pady=10)
+        def load_tree_data(students):
+            for r in tree.get_children():
+                tree.delete(r)
+            for s in students:
+                tree.insert("", "end", values=(s[0], s[1], s[5], s[3], s[4], s[6]))
 
-        # Action 1: View / Generate Student Card
+        # View ID Card Button
         def handle_view_card():
-            sel = tree.selection()
-            if not sel:
-                messagebox.showwarning("Notice", "Please select a student from the table first")
+            if not selected_student[0]:
+                messagebox.showwarning("Selection Required", "Please select a student from the table.")
                 return
-            s_id = tree.item(sel[0], "values")[0]
-            # Fetch complete tuple: (id, pwd, name, age, gender, phone, class, email, image)
-            full_data = get_student_by_id(s_id)
-            if full_data:
-                # Open Student Card Page Window
-                card_win = tk.Toplevel(root)
-                card_win.title(f"Student Card - {full_data[2]}")
-                card_win.geometry("500x600")
-                card_win.resizable(False, False)
-                card_win.configure(bg="#F8FAFC")
-                from student_card_page import start_student_card_page
-                start_student_card_page(card_win, full_data, prev_page='admin')
+            st = selected_student[0]
+            from student_card_page import draw_student_card
+            img = Image.open(io.BytesIO(st[8])).convert("RGBA") if st[8] else None
+            card = draw_student_card(st[2], st[6], st[3], st[0], img)
 
-        # Action 2: Edit Student Details
-        def handle_edit_student():
-            sel = tree.selection()
-            if not sel:
-                messagebox.showwarning("Notice", "Please select a student from the table first")
-                return
-            s_id = tree.item(sel[0], "values")[0]
-            rec = records_map.get(s_id)
-            if not rec:
-                return
+            w = tk.Toplevel(root)
+            w.title(f"Student ID Card - {st[2]}")
+            w.geometry("540x360")
+            w.resizable(False, False)
+            scaled = card.resize((500, 310), Image.Resampling.LANCZOS)
+            tk_c = ImageTk.PhotoImage(scaled)
+            l = tk.Label(w, image=tk_c)
+            l.image = tk_c
+            l.pack(pady=20)
 
-            edit_win = tk.Toplevel(root)
-            edit_win.title(f"Edit Student - {rec[1]}")
-            edit_win.geometry("420x450")
-            edit_win.configure(bg="#F1F5F9")
-            edit_win.transient(root)
-            edit_win.grab_set()
+        tk.Button(btn_box, text="🪪 View ID Card", font=('Arial', 9, 'bold'), bg="#2563EB", fg="#FFFFFF", bd=0,
+                  command=handle_view_card).pack(fill="x", pady=2, ipady=4)
 
-            tk.Label(edit_win, text=f"Edit Student Details (ID: {rec[0]})", font=('Arial', 12, 'bold'), bg="#F1F5F9", fg="#0F172A").pack(pady=15)
-
-            form = tk.Frame(edit_win, bg="#F1F5F9")
-            form.pack(padx=20)
-
-            tk.Label(form, text="Full Name:", font=('Arial', 10, 'bold'), bg="#F1F5F9").grid(row=0, column=0, sticky="w", pady=6)
-            name_e = tk.Entry(form, font=('Arial', 10), width=28)
-            name_e.insert(0, rec[1])
-            name_e.grid(row=0, column=1, pady=6)
-
-            tk.Label(form, text="Age:", font=('Arial', 10, 'bold'), bg="#F1F5F9").grid(row=1, column=0, sticky="w", pady=6)
-            age_e = tk.Entry(form, font=('Arial', 10), width=28)
-            age_e.insert(0, rec[2])
-            age_e.grid(row=1, column=1, pady=6)
-
-            tk.Label(form, text="Gender:", font=('Arial', 10, 'bold'), bg="#F1F5F9").grid(row=2, column=0, sticky="w", pady=6)
-            gen_var = tk.StringVar(value=rec[3])
-            gen_cb = ttk.Combobox(form, textvariable=gen_var, values=["Male", "Female", "Other"], state="readonly", width=26)
-            gen_cb.grid(row=2, column=1, pady=6)
-
-            tk.Label(form, text="Phone:", font=('Arial', 10, 'bold'), bg="#F1F5F9").grid(row=3, column=0, sticky="w", pady=6)
-            phone_e = tk.Entry(form, font=('Arial', 10), width=28)
-            phone_e.insert(0, rec[4])
-            phone_e.grid(row=3, column=1, pady=6)
-
-            tk.Label(form, text="Class / Year:", font=('Arial', 10, 'bold'), bg="#F1F5F9").grid(row=4, column=0, sticky="w", pady=6)
-            cls_var = tk.StringVar(value=rec[5])
-            cls_cb = ttk.Combobox(form, textvariable=cls_var, values=["1st year", "2nd year", "3rd year", "4th year"], state="readonly", width=26)
-            cls_cb.grid(row=4, column=1, pady=6)
-
-            tk.Label(form, text="Email:", font=('Arial', 10, 'bold'), bg="#F1F5F9").grid(row=5, column=0, sticky="w", pady=6)
-            email_e = tk.Entry(form, font=('Arial', 10), width=28)
-            email_e.insert(0, rec[6])
-            email_e.grid(row=5, column=1, pady=6)
-
-            def save_admin_edit():
-                n_v = name_e.get().strip()
-                a_v = age_e.get().strip()
-                g_v = gen_var.get().strip()
-                p_v = phone_e.get().strip()
-                c_v = cls_var.get().strip()
-                e_v = email_e.get().strip()
-
-                if not n_v or not a_v or not p_v or not c_v or not e_v:
-                    messagebox.showwarning("Notice", "Please fill in all fields")
-                    return
-
-                try:
-                    update_student(
-                        id_number=rec[0],
-                        name=n_v,
-                        age=a_v,
-                        gender=g_v,
-                        phone_number=p_v,
-                        student_class=c_v,
-                        email=e_v
-                    )
-                    messagebox.showinfo("Success", "Student details updated successfully!")
-                    edit_win.destroy()
-                    load_tree_data(get_all_students())
-                except Exception as err:
-                    messagebox.showerror("Error", f"Could not update student: {err}")
-
-            tk.Button(edit_win, text="Save Updates", font=('Arial', 11, 'bold'), bg="#16A34A", fg="#FFFFFF", bd=0, command=save_admin_edit).pack(pady=20, ipadx=10, ipady=4)
-
-        # Action 3: Delete Student
+        # Delete Student Button
         def handle_delete_student():
-            sel = tree.selection()
-            if not sel:
-                messagebox.showwarning("Notice", "Please select a student from the table to delete")
+            if not selected_student[0]:
+                messagebox.showwarning("Selection Required", "Please select a student from the table.")
                 return
-            s_id = tree.item(sel[0], "values")[0]
-            s_name = tree.item(sel[0], "values")[1]
-
-            confirm = messagebox.askyesno(
-                "Confirm Delete",
-                f"Are you sure you want to delete student:\n\n{s_name} (ID: {s_id})?\n\nThis action cannot be undone."
-            )
+            st = selected_student[0]
+            confirm = messagebox.askyesno("Confirm Delete", f"Permanently delete student '{st[2]}' (ID: {st[0]})?")
             if confirm:
-                try:
-                    delete_student(s_id)
-                    messagebox.showinfo("Success", "Student deleted successfully.")
-                    load_tree_data(get_all_students())
-                except Exception as err:
-                    messagebox.showerror("Error", f"Failed to delete student: {err}")
+                delete_student(st[0])
+                messagebox.showinfo("Deleted", "Student record deleted successfully.")
+                selected_student[0] = None
+                avatar_lbl.config(image="", text="")
+                detail_lbl.config(text="Select a student to view details")
+                load_tree_data(get_all_students())
 
-        # Buttons Placement
-        btn_view_card = tk.Button(actions_bar, text="🪪 View / Print ID Card", font=('Arial', 11, 'bold'), bg="#159BD7", fg="#FFFFFF", bd=0, command=handle_view_card)
-        btn_view_card.pack(side="left", padx=6, ipady=6, ipadx=10)
+        tk.Button(btn_box, text="🗑️ Delete Student", font=('Arial', 9, 'bold'), bg="#DC2626", fg="#FFFFFF", bd=0,
+                  command=handle_delete_student).pack(fill="x", pady=2, ipady=4)
 
-        btn_edit = tk.Button(actions_bar, text="✏️ Edit Student", font=('Arial', 11, 'bold'), bg="#2563EB", fg="#FFFFFF", bd=0, command=handle_edit_student)
-        btn_edit.pack(side="left", padx=6, ipady=6, ipadx=10)
-
-        btn_delete = tk.Button(actions_bar, text="❌ Delete Student", font=('Arial', 11, 'bold'), bg="#DC2626", fg="#FFFFFF", bd=0, command=handle_delete_student)
-        btn_delete.pack(side="left", padx=6, ipady=6, ipadx=10)
-
-        btn_refresh = tk.Button(actions_bar, text="🔄 Refresh Table", font=('Arial', 11), bg="#E2E8F0", fg="#0F172A", bd=0, command=lambda: load_tree_data(get_all_students()))
-        btn_refresh.pack(side="left", padx=6, ipady=6, ipadx=10)
-
-        # Initial Load
         load_tree_data(get_all_students())
 
     # ==========================================
-    # TAB 3: ANNOUNCEMENTS (Part 13B)
+    # TAB 3: ATTENDANCE MANAGEMENT (NEW! #humanrised)
+    # ==========================================
+    def show_attendance_view():
+        clear_content()
+        set_active_btn("attendance")
+
+        title_row = tk.Frame(content_fm, bg="#F8FAFC")
+        title_row.pack(fill="x", pady=(0, 10))
+        tk.Label(title_row, text="Attendance Management System", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A").pack(side="left")
+
+        # Control & Filter Bar
+        ctrl_bar = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
+        ctrl_bar.pack(fill="x", pady=(0, 10), ipady=6, ipadx=10)
+
+        # Date Selector (defaults to today)
+        tk.Label(ctrl_bar, text="Date (YYYY-MM-DD):", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").pack(side="left", padx=(10, 4))
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
+        date_ent = tk.Entry(ctrl_bar, font=('Arial', 10), width=12)
+        date_ent.insert(0, today_str)
+        date_ent.pack(side="left", padx=5)
+
+        # Class Selector
+        tk.Label(ctrl_bar, text="Class:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").pack(side="left", padx=(15, 4))
+        class_var = tk.StringVar(value="All Classes")
+        class_cb = ttk.Combobox(ctrl_bar, textvariable=class_var, values=["All Classes", "1st year", "2nd year", "3rd year", "4th year"], state="readonly", width=14)
+        class_cb.pack(side="left", padx=5)
+
+        # Table Container
+        tbl_fm = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
+        tbl_fm.pack(fill="both", expand=True)
+
+        cols = ("id", "name", "class", "status")
+        tree = ttk.Treeview(tbl_fm, columns=cols, show="headings", height=12)
+        tree.heading("id", text="Student ID")
+        tree.heading("name", text="Student Name")
+        tree.heading("class", text="Class / Year")
+        tree.heading("status", text="Current Status")
+
+        tree.column("id", width=120, anchor="center")
+        tree.column("name", width=200, anchor="w")
+        tree.column("class", width=130, anchor="center")
+        tree.column("status", width=150, anchor="center")
+
+        scr = ttk.Scrollbar(tbl_fm, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scr.set)
+        tree.pack(side="left", fill="both", expand=True)
+        scr.pack(side="right", fill="y")
+
+        # Map to hold in-memory status for current date: {student_id: status}
+        student_status_map = {}
+
+        def refresh_attendance_table():
+            student_status_map.clear()
+            for r in tree.get_children():
+                tree.delete(r)
+
+            d_str = date_ent.get().strip()
+            c_str = class_var.get().strip()
+            records = get_attendance_for_date_and_class(d_str, c_str)
+
+            for sid, sname, sclass, stat in records:
+                # Default to 'Present' if not yet marked
+                actual_stat = stat if stat != 'Not Marked' else 'Present'
+                student_status_map[sid] = (sclass, actual_stat)
+                tree.insert("", "end", iid=sid, values=(sid, sname, sclass, actual_stat))
+
+        def load_btn_click():
+            refresh_attendance_table()
+
+        tk.Button(ctrl_bar, text="🔄 Load / Filter", font=('Arial', 9, 'bold'), bg="#2563EB", fg="#FFFFFF", bd=0,
+                  command=load_btn_click).pack(side="left", padx=8, ipadx=8)
+
+        # Quick Mark Buttons on ctrl bar
+        def mark_all_present():
+            for sid in student_status_map:
+                sclass, _ = student_status_map[sid]
+                student_status_map[sid] = (sclass, "Present")
+                item = tree.item(sid)
+                tree.item(sid, values=(item["values"][0], item["values"][1], item["values"][2], "Present"))
+
+        tk.Button(ctrl_bar, text="✅ Mark All Present", font=('Arial', 9, 'bold'), bg="#16A34A", fg="#FFFFFF", bd=0,
+                  command=mark_all_present).pack(side="left", padx=8, ipadx=8)
+
+        # Toggle individual student attendance status by double clicking row
+        def on_row_double_click(event):
+            sel = tree.selection()
+            if not sel:
+                return
+            sid = sel[0]
+            item = tree.item(sid)
+            curr = item["values"][3]
+            nxt = "Absent" if curr == "Present" else ("Leave" if curr == "Absent" else "Present")
+            sclass, _ = student_status_map[sid]
+            student_status_map[sid] = (sclass, nxt)
+            tree.item(sid, values=(item["values"][0], item["values"][1], item["values"][2], nxt))
+
+        tree.bind("<Double-1>", on_row_double_click)
+
+        # Bottom Bar: Save & Export
+        btm_bar = tk.Frame(content_fm, bg="#F8FAFC")
+        btm_bar.pack(fill="x", pady=10)
+
+        tk.Label(btm_bar, text="💡 Tip: Double-click any row to toggle between Present ➔ Absent ➔ Leave",
+                 font=('Arial', 9, 'italic'), bg="#F8FAFC", fg="#64748B").pack(side="left")
+
+        def handle_save_attendance():
+            d_str = date_ent.get().strip()
+            if not d_str:
+                messagebox.showerror("Error", "Please specify a valid date.")
+                return
+            try:
+                for sid, (sclass, stat) in student_status_map.items():
+                    mark_attendance(sid, d_str, stat, sclass)
+                messagebox.showinfo("Saved", f"Attendance for {len(student_status_map)} students saved successfully for {d_str}!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save attendance: {str(e)}")
+
+        def handle_export_attendance():
+            d_str = date_ent.get().strip()
+            c_str = class_var.get().strip()
+            fpath = filedialog.asksaveasfilename(
+                title="Export Attendance to Excel",
+                defaultextension=".xlsx",
+                filetypes=[("Excel Workbook", "*.xlsx"), ("CSV File", "*.csv")],
+                initialfile=f"Attendance_{d_str}_{c_str.replace(' ', '_')}.xlsx"
+            )
+            if fpath:
+                try:
+                    count = excel_manager.export_attendance_to_excel(d_str, c_str, fpath)
+                    messagebox.showinfo("Export Successful", f"Exported {count} attendance records to:\n{fpath}")
+                except Exception as e:
+                    messagebox.showerror("Export Error", f"Failed to export attendance:\n{str(e)}")
+
+        tk.Button(btm_bar, text="💾 Save Attendance to DB", font=('Arial', 10, 'bold'), bg="#16A34A", fg="#FFFFFF", bd=0,
+                  command=handle_save_attendance).pack(side="right", padx=6, ipady=4, ipadx=12)
+
+        tk.Button(btm_bar, text="📥 Export Attendance to Excel", font=('Arial', 10, 'bold'), bg="#0284C7", fg="#FFFFFF", bd=0,
+                  command=handle_export_attendance).pack(side="right", padx=6, ipady=4, ipadx=12)
+
+        refresh_attendance_table()
+
+    # ==========================================
+    # TAB 4: EXAM MARKS & RESULTS (NEW! #humanrised)
+    # ==========================================
+    def show_marks_view():
+        clear_content()
+        set_active_btn("marks")
+
+        top_row = tk.Frame(content_fm, bg="#F8FAFC")
+        top_row.pack(fill="x", pady=(0, 10))
+        tk.Label(top_row, text="Examinations, Marks & Report Cards", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A").pack(side="left")
+
+        # Action / Filter Bar
+        bar = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
+        bar.pack(fill="x", pady=(0, 10), ipady=6, ipadx=10)
+
+        tk.Label(bar, text="Filter Exam:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").pack(side="left", padx=(10, 4))
+        exam_filter_var = tk.StringVar(value="All Exams")
+        exam_filter_cb = ttk.Combobox(bar, textvariable=exam_filter_var, values=["All Exams", "Mid-Term Exam 2026", "Final Exam 2026", "Semester 1", "Semester 2"], state="readonly", width=18)
+        exam_filter_cb.pack(side="left", padx=5)
+
+        tk.Label(bar, text="Class:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").pack(side="left", padx=(10, 4))
+        c_filter_var = tk.StringVar(value="All Classes")
+        c_filter_cb = ttk.Combobox(bar, textvariable=c_filter_var, values=["All Classes", "1st year", "2nd year", "3rd year", "4th year"], state="readonly", width=12)
+        c_filter_cb.pack(side="left", padx=5)
+
+        # Marks Table
+        tbl_fm = tk.Frame(content_fm, bg="#FFFFFF", bd=1, relief="solid")
+        tbl_fm.pack(fill="both", expand=True)
+
+        cols = ("mid", "sid", "name", "class", "exam", "total", "pct", "grade", "date")
+        tree = ttk.Treeview(tbl_fm, columns=cols, show="headings", height=10)
+
+        tree.heading("mid", text="ID")
+        tree.heading("sid", text="Student ID")
+        tree.heading("name", text="Full Name")
+        tree.heading("class", text="Class / Year")
+        tree.heading("exam", text="Exam Name")
+        tree.heading("total", text="Total (500)")
+        tree.heading("pct", text="Percentage")
+        tree.heading("grade", text="Grade")
+        tree.heading("date", text="Date")
+
+        tree.column("mid", width=40, anchor="center")
+        tree.column("sid", width=95, anchor="center")
+        tree.column("name", width=140, anchor="w")
+        tree.column("class", width=85, anchor="center")
+        tree.column("exam", width=130, anchor="w")
+        tree.column("total", width=85, anchor="center")
+        tree.column("pct", width=85, anchor="center")
+        tree.column("grade", width=65, anchor="center")
+        tree.column("date", width=95, anchor="center")
+
+        scr = ttk.Scrollbar(tbl_fm, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scr.set)
+        tree.pack(side="left", fill="both", expand=True)
+        scr.pack(side="right", fill="y")
+
+        def load_marks_table():
+            for r in tree.get_children():
+                tree.delete(r)
+            ex_val = exam_filter_var.get().strip()
+            cl_val = c_filter_var.get().strip()
+            records = get_marks_by_exam_and_class(ex_val, cl_val)
+            for m_id, s_id, s_name, s_class, e_name, tot, pct, gr, dt in records:
+                tree.insert("", "end", iid=m_id, values=(m_id, s_id, s_name, s_class, e_name, f"{tot:.1f}", f"{pct:.1f}%", gr, dt))
+
+        exam_filter_cb.bind("<<ComboboxSelected>>", lambda e: load_marks_table())
+        c_filter_cb.bind("<<ComboboxSelected>>", lambda e: load_marks_table())
+
+        # Modal Dialog to Enter / Update Marks
+        def open_add_marks_dialog():
+            students = get_all_students()
+            if not students:
+                messagebox.showwarning("No Students", "No students available to assign marks.")
+                return
+
+            win = tk.Toplevel(root)
+            win.title("Enter / Update Student Exam Marks")
+            win.geometry("520x560")
+            win.resizable(False, False)
+            win.configure(bg="#F8FAFC")
+            win.grab_set()
+
+            tk.Label(win, text="Record Student Examination Marks", font=('Arial', 14, 'bold'), bg="#F8FAFC", fg="#1E3A5F").pack(pady=(15, 10))
+
+            card = tk.Frame(win, bg="#FFFFFF", bd=1, relief="solid")
+            card.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+
+            f_grid = tk.Frame(card, bg="#FFFFFF")
+            f_grid.pack(padx=20, pady=15, fill="both")
+
+            # Student Choice
+            tk.Label(f_grid, text="Select Student:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=0, column=0, sticky="w", pady=6)
+            s_choices = [f"{s[0]} - {s[1]} ({s[5]})" for s in students]
+            s_var = tk.StringVar(value=s_choices[0])
+            s_cb = ttk.Combobox(f_grid, textvariable=s_var, values=s_choices, state="readonly", width=30)
+            s_cb.grid(row=0, column=1, sticky="w", pady=6)
+
+            # Exam Title
+            tk.Label(f_grid, text="Exam Name:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=1, column=0, sticky="w", pady=6)
+            exam_name_var = tk.StringVar(value="Mid-Term Exam 2026")
+            exam_cb = ttk.Combobox(f_grid, textvariable=exam_name_var, values=["Mid-Term Exam 2026", "Final Exam 2026", "Semester 1", "Semester 2", "Class Assessment"], width=28)
+            exam_cb.grid(row=1, column=1, sticky="w", pady=6)
+
+            # Exam Date
+            tk.Label(f_grid, text="Exam Date:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").grid(row=2, column=0, sticky="w", pady=6)
+            date_e = tk.Entry(f_grid, font=('Arial', 10), width=20)
+            date_e.insert(0, datetime.date.today().strftime("%d-%b-%Y"))
+            date_e.grid(row=2, column=1, sticky="w", pady=6)
+
+            tk.Frame(f_grid, bg="#E2E8F0", height=1).grid(row=3, column=0, columnspan=2, sticky="ew", pady=10)
+
+            # 5 Subject Marks
+            defaults = [
+                ("Mathematics", "85"),
+                ("Physics / Computer", "88"),
+                ("Chemistry / Electronics", "82"),
+                ("Programming Lab", "90"),
+                ("English & Communication", "84"),
+            ]
+            s_entries = []
+            m_entries = []
+
+            for i, (def_s, def_m) in enumerate(defaults):
+                r_idx = 4 + i
+                s_ent = tk.Entry(f_grid, font=('Arial', 9), width=22)
+                s_ent.insert(0, def_s)
+                s_ent.grid(row=r_idx, column=0, sticky="w", pady=4, padx=(0, 10))
+
+                m_ent = tk.Entry(f_grid, font=('Arial', 9), width=8, justify="center")
+                m_ent.insert(0, def_m)
+                m_ent.grid(row=r_idx, column=1, sticky="w", pady=4)
+
+                s_entries.append(s_ent)
+                m_entries.append(m_ent)
+
+            def save_marks_action():
+                chosen_str = s_var.get()
+                sid = chosen_str.split(" - ")[0].strip()
+                ex_name = exam_cb.get().strip()
+                ex_dt = date_e.get().strip()
+
+                if not ex_name:
+                    messagebox.showerror("Error", "Please enter an Exam Name.", parent=win)
+                    return
+
+                try:
+                    s_vals = [e.get().strip() for e in s_entries]
+                    m_vals = [float(e.get().strip()) for e in m_entries]
+                    for m in m_vals:
+                        if m < 0 or m > 100:
+                            messagebox.showerror("Invalid Marks", "Marks must be between 0 and 100.", parent=win)
+                            return
+                except ValueError:
+                    messagebox.showerror("Error", "Please enter valid numeric marks for all subjects.", parent=win)
+                    return
+
+                try:
+                    tot, pct, grd = save_or_update_marks(
+                        student_id=sid,
+                        exam_name=ex_name,
+                        s1=s_vals[0], m1=m_vals[0],
+                        s2=s_vals[1], m2=m_vals[1],
+                        s3=s_vals[2], m3=m_vals[2],
+                        s4=s_vals[3], m4=m_vals[3],
+                        s5=s_vals[4], m5=m_vals[4],
+                        exam_date=ex_dt
+                    )
+                    messagebox.showinfo("Saved", f"Marks saved successfully!\nTotal: {tot}/500 | {pct:.1f}% | Grade: {grd}", parent=win)
+                    win.destroy()
+                    load_marks_table()
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to save marks: {str(e)}", parent=win)
+
+            tk.Button(card, text="💾 Save Marks & Calculate Grade", font=('Arial', 10, 'bold'), bg="#16A34A", fg="#FFFFFF", bd=0,
+                      command=save_marks_action).pack(pady=(0, 15), ipady=5, ipadx=15)
+
+        tk.Button(bar, text="➕ Enter / Update Marks", font=('Arial', 9, 'bold'), bg="#16A34A", fg="#FFFFFF", bd=0,
+                  command=open_add_marks_dialog).pack(side="right", padx=6, ipadx=10)
+
+        # Bottom Bar: View Report Card, Delete, Export
+        btm_bar = tk.Frame(content_fm, bg="#F8FAFC")
+        btm_bar.pack(fill="x", pady=10)
+
+        def handle_view_report_card():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning("Selection Required", "Please select a student's exam record from the table.")
+                return
+            m_id = sel[0]
+            item = tree.item(m_id)
+            sid = item["values"][1]
+            exam_name = item["values"][4]
+
+            # Fetch full record
+            from database import get_student_marks
+            records = get_student_marks(sid)
+            match_rec = next((r for r in records if r[1] == exam_name), None)
+            if not match_rec:
+                messagebox.showerror("Error", "Could not load exam details.")
+                return
+
+            preview_report_card_window(root, sid, match_rec)
+
+        def handle_delete_marks():
+            sel = tree.selection()
+            if not sel:
+                messagebox.showwarning("Selection Required", "Please select an exam record to delete.")
+                return
+            m_id = sel[0]
+            if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this examination record?"):
+                delete_marks_record(m_id)
+                load_marks_table()
+
+        def handle_export_marks():
+            ex_val = exam_filter_var.get().strip()
+            cl_val = c_filter_var.get().strip()
+            fpath = filedialog.asksaveasfilename(
+                title="Export Results to Excel",
+                defaultextension=".xlsx",
+                filetypes=[("Excel Workbook", "*.xlsx"), ("CSV File", "*.csv")],
+                initialfile=f"Results_{ex_val.replace(' ', '_')}_{cl_val.replace(' ', '_')}.xlsx"
+            )
+            if fpath:
+                try:
+                    count = excel_manager.export_marks_to_excel(ex_val, cl_val, fpath)
+                    messagebox.showinfo("Export Successful", f"Exported {count} exam results to:\n{fpath}")
+                except Exception as e:
+                    messagebox.showerror("Export Error", f"Failed to export marks:\n{str(e)}")
+
+        tk.Button(btm_bar, text="📄 View / Print Official Report Card", font=('Arial', 10, 'bold'), bg="#2563EB", fg="#FFFFFF", bd=0,
+                  command=handle_view_report_card).pack(side="left", padx=5, ipady=4, ipadx=12)
+
+        tk.Button(btm_bar, text="🗑️ Delete Record", font=('Arial', 10, 'bold'), bg="#DC2626", fg="#FFFFFF", bd=0,
+                  command=handle_delete_marks).pack(side="left", padx=5, ipady=4, ipadx=10)
+
+        tk.Button(btm_bar, text="📥 Export Results to Excel", font=('Arial', 10, 'bold'), bg="#0284C7", fg="#FFFFFF", bd=0,
+                  command=handle_export_marks).pack(side="right", padx=5, ipady=4, ipadx=12)
+
+        load_marks_table()
+
+    # ==========================================
+    # TAB 5: EXCEL CENTER & DATA HUB (NEW! #humanrised)
+    # ==========================================
+    def show_excel_center_view():
+        clear_content()
+        set_active_btn("excel")
+
+        title_row = tk.Frame(content_fm, bg="#F8FAFC")
+        title_row.pack(fill="x", pady=(0, 10))
+        tk.Label(title_row, text="Excel & Data Integration Hub", font=('Arial', 16, 'bold'), bg="#F8FAFC", fg="#0F172A").pack(side="left")
+
+        # Two Main Panels: Export (Left) and Bulk Import (Right)
+        panels = tk.Frame(content_fm, bg="#F8FAFC")
+        panels.pack(fill="both", expand=True)
+
+        # Panel 1: Export Hub
+        p1 = tk.Frame(panels, bg="#FFFFFF", bd=1, relief="solid")
+        p1.pack(side="left", fill="both", expand=True, padx=(0, 8), pady=5)
+
+        tk.Label(p1, text="📥 Export Data to Excel / CSV", font=('Arial', 13, 'bold'), bg="#FFFFFF", fg="#1E3A5F").pack(anchor="w", padx=20, pady=(15, 6))
+        tk.Label(p1, text="Generate formatted spreadsheets for offline reporting & records.", font=('Arial', 9), bg="#FFFFFF", fg="#64748B").pack(anchor="w", padx=20, pady=(0, 10))
+        tk.Frame(p1, bg="#E2E8F0", height=1).pack(fill="x", padx=20, pady=(0, 15))
+
+        def export_all_students_action():
+            fpath = filedialog.asksaveasfilename(
+                title="Export Students to Excel",
+                defaultextension=".xlsx",
+                filetypes=[("Excel Workbook", "*.xlsx"), ("CSV File", "*.csv")],
+                initialfile="All_Registered_Students.xlsx"
+            )
+            if fpath:
+                try:
+                    count = excel_manager.export_students_to_excel(fpath)
+                    messagebox.showinfo("Export Successful", f"Successfully exported {count} student records to:\n{fpath}")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Export failed:\n{str(e)}")
+
+        tk.Button(p1, text="📑 Export All Students List (.xlsx)", font=('Arial', 10, 'bold'), bg="#2563EB", fg="#FFFFFF", bd=0,
+                  command=export_all_students_action).pack(fill="x", padx=25, pady=8, ipady=6)
+
+        def export_attendance_action():
+            show_attendance_view()
+
+        tk.Button(p1, text="📅 Export Attendance Sheets (.xlsx)", font=('Arial', 10, 'bold'), bg="#0284C7", fg="#FFFFFF", bd=0,
+                  command=export_attendance_action).pack(fill="x", padx=25, pady=8, ipady=6)
+
+        def export_marks_action():
+            show_marks_view()
+
+        tk.Button(p1, text="📝 Export Exam Marksheets (.xlsx)", font=('Arial', 10, 'bold'), bg="#16A34A", fg="#FFFFFF", bd=0,
+                  command=export_marks_action).pack(fill="x", padx=25, pady=8, ipady=6)
+
+        # Panel 2: Bulk Import Hub
+        p2 = tk.Frame(panels, bg="#FFFFFF", bd=1, relief="solid")
+        p2.pack(side="right", fill="both", expand=True, padx=(8, 0), pady=5)
+
+        tk.Label(p2, text="📤 Bulk Import Students", font=('Arial', 13, 'bold'), bg="#FFFFFF", fg="#1E3A5F").pack(anchor="w", padx=20, pady=(15, 6))
+        tk.Label(p2, text="Register 50-500+ students instantly using an Excel or CSV file.", font=('Arial', 9), bg="#FFFFFF", fg="#64748B").pack(anchor="w", padx=20, pady=(0, 10))
+        tk.Frame(p2, bg="#E2E8F0", height=1).pack(fill="x", padx=20, pady=(0, 15))
+
+        def download_template_action():
+            fpath = filedialog.asksaveasfilename(
+                title="Save Sample Student Template",
+                defaultextension=".xlsx",
+                filetypes=[("Excel Workbook", "*.xlsx"), ("CSV File", "*.csv")],
+                initialfile="Sample_Student_Import_Template.xlsx"
+            )
+            if fpath:
+                try:
+                    excel_manager.generate_student_sample_template(fpath)
+                    messagebox.showinfo("Template Downloaded", f"Pre-formatted template saved successfully to:\n{fpath}\n\nYou can fill student records into this file and import it!")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to save template:\n{str(e)}")
+
+        tk.Button(p2, text="📄 Download Sample Excel Template", font=('Arial', 10, 'bold'), bg="#475569", fg="#FFFFFF", bd=0,
+                  command=download_template_action).pack(fill="x", padx=25, pady=8, ipady=6)
+
+        status_box = tk.Text(p2, font=('Consolas', 9), height=7, bg="#F8FAFC", bd=1, relief="solid")
+        status_box.insert("1.0", "Ready to import. Click 'Choose Excel File to Import...' below.")
+
+        def import_file_action():
+            fpath = filedialog.askopenfilename(
+                title="Select Student Excel or CSV File to Import",
+                filetypes=[("Spreadsheet Files", "*.xlsx;*.xls;*.csv")]
+            )
+            if not fpath:
+                return
+
+            try:
+                res = excel_manager.import_students_from_excel(fpath)
+                s_cnt = res["success"]
+                sk_cnt = res["skipped"]
+                errs = res["errors"]
+
+                status_box.delete("1.0", tk.END)
+                status_box.insert(tk.END, f"=== IMPORT SUMMARY ===\n")
+                status_box.insert(tk.END, f"File: {os.path.basename(fpath)}\n")
+                status_box.insert(tk.END, f"✅ Successfully Imported: {s_cnt} students\n")
+                status_box.insert(tk.END, f"⚠️ Skipped / Duplicates: {sk_cnt} students\n")
+                if errs:
+                    status_box.insert(tk.END, f"\nDetails / Warnings:\n" + "\n".join(errs[:8]))
+
+                messagebox.showinfo("Import Complete", f"Successfully imported {s_cnt} students!\nSkipped/Duplicates: {sk_cnt}")
+            except Exception as e:
+                messagebox.showerror("Import Failed", f"Could not process file:\n{str(e)}")
+
+        tk.Button(p2, text="🚀 Choose Excel File to Import...", font=('Arial', 10, 'bold'), bg="#16A34A", fg="#FFFFFF", bd=0,
+                  command=import_file_action).pack(fill="x", padx=25, pady=8, ipady=6)
+
+        status_box.pack(fill="both", expand=True, padx=25, pady=(5, 15))
+
+    # ==========================================
+    # TAB 6: ANNOUNCEMENTS (Part 13B)
     # ==========================================
     def show_announcements_view():
         clear_content()
@@ -535,7 +882,7 @@ def start_admin_dashboard_page(root):
         row3.pack(fill="x", padx=15, pady=6)
 
         tk.Label(row3, text="Message Body:", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#475569").pack(anchor="nw", pady=(0, 4))
-        msg_text = tk.Text(row3, font=('Arial', 10), height=4, width=70)
+        msg_text = tk.Text(row3, font=('Arial', 10), height=3, width=70)
         msg_text.pack(fill="x")
 
         def handle_post_notice():
@@ -557,7 +904,7 @@ def start_admin_dashboard_page(root):
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to publish announcement: {e}")
 
-        tk.Button(compose_card, text="📢 Publish Notice", font=('Arial', 11, 'bold'), bg="#2563EB", fg="#FFFFFF", bd=0, command=handle_post_notice).pack(anchor="e", padx=15, pady=(4, 12), ipady=4, ipadx=12)
+        tk.Button(compose_card, text="📢 Publish Notice", font=('Arial', 10, 'bold'), bg="#2563EB", fg="#FFFFFF", bd=0, command=handle_post_notice).pack(anchor="e", padx=15, pady=(4, 10), ipady=4, ipadx=12)
 
         # Published Notices Feed
         tk.Label(content_fm, text="Recent Published Notices", font=('Arial', 12, 'bold'), bg="#F8FAFC", fg="#0F172A").pack(anchor="w", pady=(5, 5))
@@ -569,16 +916,16 @@ def start_admin_dashboard_page(root):
         if not notices:
             tk.Label(feed_wrap, text="No announcements published yet.", font=('Arial', 10, 'italic'), bg="#F8FAFC", fg="#64748B").pack(pady=10)
         else:
-            for n_t, n_aud, n_msg, n_d in notices[:5]:
+            for n_t, n_aud, n_msg, n_d in notices[:4]:
                 box = tk.Frame(feed_wrap, bg="#FFFFFF", bd=1, relief="solid")
-                box.pack(fill="x", pady=4)
+                box.pack(fill="x", pady=3)
 
                 top_l = tk.Frame(box, bg="#FFFFFF")
-                top_l.pack(fill="x", padx=10, pady=(6, 2))
+                top_l.pack(fill="x", padx=10, pady=(4, 2))
                 tk.Label(top_l, text=f"📢 {n_t}", font=('Arial', 10, 'bold'), bg="#FFFFFF", fg="#1E3A5F").pack(side="left")
                 tk.Label(top_l, text=f"Target: {n_aud}  |  {n_d}", font=('Arial', 8), bg="#FFFFFF", fg="#64748B").pack(side="right")
 
-                tk.Label(box, text=n_msg, font=('Arial', 9), bg="#FFFFFF", fg="#334155", wraplength=700, justify="left").pack(anchor="w", padx=10, pady=(0, 6))
+                tk.Label(box, text=n_msg, font=('Arial', 9), bg="#FFFFFF", fg="#334155", wraplength=700, justify="left").pack(anchor="w", padx=10, pady=(0, 4))
 
     # ==========================================
     # LOGOUT (Returns to Welcome Page)
@@ -597,6 +944,9 @@ def start_admin_dashboard_page(root):
     nav_items = [
         ("home", "📊  Dashboard Home", show_metrics_view),
         ("students", "📋  Manage Students", show_students_table_view),
+        ("attendance", "📅  Daily Attendance", show_attendance_view),
+        ("marks", "📝  Exams & Marksheets", show_marks_view),
+        ("excel", "📊  Excel & Data Hub", show_excel_center_view),
         ("announcements", "📢  Announcements", show_announcements_view),
     ]
 
@@ -612,10 +962,10 @@ def start_admin_dashboard_page(root):
             bd=0,
             relief='flat',
             anchor="w",
-            padx=20,
+            padx=18,
             command=cmd,
         )
-        btn.pack(fill="x", pady=2, ipady=8)
+        btn.pack(fill="x", pady=2, ipady=6)
         nav_buttons[key] = btn
 
     # Logout Button at bottom
@@ -629,10 +979,10 @@ def start_admin_dashboard_page(root):
         activeforeground="#FFFFFF",
         bd=0,
         anchor="w",
-        padx=20,
+        padx=18,
         command=handle_admin_logout,
     )
-    logout_btn.pack(side="bottom", fill="x", pady=20, ipady=8)
+    logout_btn.pack(side="bottom", fill="x", pady=15, ipady=6)
 
     # Launch initial view
     show_metrics_view()

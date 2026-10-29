@@ -18,13 +18,22 @@ def create_default_avatar_bytes(name="Student"):
     img = Image.new("RGBA", (100, 100), color=(52, 152, 219, 255)) # Soft blue background
     draw = ImageDraw.Draw(img)
     
-    # Draw simple centered initial
+    # Draw centered initial using textbbox for accurate placement
     try:
         font = ImageFont.truetype("arial.ttf", 48)
     except Exception:
         font = ImageFont.load_default()
-        
-    draw.text((36, 26), initial, fill="white", font=font)
+
+    try:
+        bbox = draw.textbbox((0, 0), initial, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+        x = (100 - text_w) // 2
+        y = (100 - text_h) // 2
+    except Exception:
+        x, y = 36, 26
+
+    draw.text((x, y), initial, fill="white", font=font)
     
     buffer = io.BytesIO()
     img.save(buffer, format="PNG")

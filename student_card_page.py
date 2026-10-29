@@ -13,6 +13,102 @@ BASE_DIR = os.path.dirname(__file__)
 IMAGES_DIR = os.path.join(BASE_DIR, 'Images')
 
 
+def draw_student_card(student_name, student_class, student_age, student_id, student_image=None):
+    """
+    Generates a PIL Image of the Student ID Card for preview and export.
+    Called from admin_dashboard_page and student_dashboard_page.
+
+    Parameters:
+        student_name  (str): Full name of the student.
+        student_class (str): Class / year (e.g. '1st year').
+        student_age   (str): Age of the student.
+        student_id    (str): Unique student ID number.
+        student_image (PIL.Image or None): RGBA profile image, or None for default avatar.
+
+    Returns:
+        PIL.Image: Rendered ID card as a PIL RGB image (360x360 px).
+    """
+    card_width, card_height = 360, 360
+
+    # Load card frame background
+    frame_path = os.path.join(IMAGES_DIR, 'student_card_frame.png')
+    if os.path.exists(frame_path):
+        card_img = Image.open(frame_path).convert('RGBA').resize((card_width, card_height), Image.Resampling.LANCZOS)
+    else:
+        card_img = Image.new('RGBA', (card_width, card_height), color='#FFFFFF')
+
+    draw = ImageDraw.Draw(card_img)
+
+    # Load fonts safely
+    def _font(size, bold=False):
+        names = ['arialbd.ttf', 'calibrib.ttf', 'segoeuib.ttf'] if bold else ['arial.ttf', 'calibri.ttf', 'segoeui.ttf']
+        for name in names:
+            try:
+                return ImageFont.truetype(name, size)
+            except Exception:
+                continue
+        return ImageFont.load_default()
+
+    font_title    = _font(11, bold=True)
+    font_subtitle = _font(13, bold=True)
+    font_name     = _font(14, bold=True)
+    font_bold     = _font(12, bold=True)
+    font_regular  = _font(11, bold=False)
+    font_small    = _font(10, bold=False)
+
+    # --- Header text ---
+    draw.text((card_width // 2, 28), 'STUDENT MANAGEMENT SYSTEM',
+              fill='#1e3a5f', anchor='mm', font=font_title)
+    draw.text((card_width // 2, 48), 'STUDENT IDENTITY CARD',
+              fill='#081579', anchor='mm', font=font_subtitle)
+    draw.line([(30, 62), (card_width - 30, 62)], fill='#048D9C', width=2)
+
+    # --- Profile photo ---
+    photo_x, photo_y = 35, 78
+    if student_image is not None:
+        try:
+            profile = student_image.convert('RGBA').resize((70, 70), Image.Resampling.LANCZOS)
+        except Exception:
+            profile = None
+    else:
+        default_path = os.path.join(IMAGES_DIR, 'add_student_img.png')
+        profile = Image.open(default_path).convert('RGBA').resize((70, 70), Image.Resampling.LANCZOS) \
+            if os.path.exists(default_path) else None
+
+    if profile:
+        card_img.paste(profile, (photo_x, photo_y), profile)
+    else:
+        draw.rectangle([photo_x, photo_y, photo_x + 70, photo_y + 70], fill='#E2E8F0')
+
+    draw.rectangle([photo_x - 2, photo_y - 2, photo_x + 72, photo_y + 72],
+                   outline='#1e3a5f', width=2)
+
+    # --- Student details ---
+    draw.text((120, 80),  str(student_name),                fill='#1e3a5f', font=font_name)
+    draw.text((120, 105), f'ID: {student_id}',              fill='#081579', font=font_bold)
+    draw.text((120, 128), f'Year: {student_class}',         fill='#334155', font=font_regular)
+
+    draw.line([(30, 158), (card_width - 30, 158)], fill='#CBD5E1', width=1)
+
+    details = [
+        ('Age:',        f'{student_age} yrs'),
+        ('Class:',      str(student_class)),
+    ]
+    start_y = 175
+    line_spacing = 30
+    for i, (label, val) in enumerate(details):
+        cy = start_y + i * line_spacing
+        draw.text((35, cy),  label, fill='#475569', font=font_bold)
+        draw.text((120, cy), val,   fill='#0F172A', font=font_regular)
+
+    # --- Footer ---
+    draw.line([(30, 305), (card_width - 30, 305)], fill='#048D9C', width=1)
+    draw.text((card_width // 2, 325), 'Authorized Student Identity',
+              fill='#64748B', anchor='mm', font=font_small)
+
+    return card_img.convert('RGB')
+
+
 def start_student_card_page(root, student_data, prev_page='welcome'):
     """
     Renders the Student ID Card Page.

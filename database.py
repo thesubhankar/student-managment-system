@@ -459,5 +459,3 @@ def delete_marks_record(marks_id):
     connection.close()
 
 
-# Initialize all tables on startup
-init_database()
